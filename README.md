@@ -1,5 +1,10 @@
 # Courses-CS1411-FinalProject
 
+## Logistics
+- Copy this repo into the CS 1411 cluster
+- Edit files as necessary
+- Push often back to GitHub
+
 ## Deadlines
 - Friday April 10, I will show them the trace files and point them in the right direction
 - By Tuesday April 14, submit your team of up to 4
