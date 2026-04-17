@@ -18,4 +18,8 @@
 - Better - sweep parameters to show design space
 - Best - make a novel novel change to an existing paper to show improvement
 
-
+## File Setup
+- benchmarks: libquanutm and dealii executables
+- predictors: part 1 (tage), part 2 (paper), and part 3 (custom) predictors and executables, along with makefiles
+- saved-results: for any results we want to save for reference after a slurm script submission, these will be found here
+- submit.slurm: what we use to submit jobs to the slurm cluster
