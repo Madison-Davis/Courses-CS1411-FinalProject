@@ -298,7 +298,7 @@ bool tage_predict(ADDRINT inst_ptr)
     g_altpred    = g_prediction;
     bool found_provider = false;
 
-    // Walk longest -> shortest
+    // Walk longest => shortest
     for (int i = NTABLES - 2; i >= 0; --i)
     {
         int n_hist   = tagged_tables[i].n_hist;
