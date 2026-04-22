@@ -1,10 +1,10 @@
 Experiment                       Miss Rate (%)
 ----------------------------------------------
-2bit-bht_DEFAULTARGS_quantum           0.4535%
 tage_DEFAULTARGS_quantum               2.0134%
-2bit-bht_DEFAULTARGS_dealII            3.6064%
+2bit-bht_DEFAULTARGS_quantum           4.7224%
 tage_DEFAULTARGS_dealII                6.5106%
 2bit_DEFAULTARGS_quantum               6.7500%
 1bit_DEFAULTARGS_quantum               8.7750%
 2bit_DEFAULTARGS_dealII               12.4549%
+2bit-bht_DEFAULTARGS_dealII           13.8114%
 1bit_DEFAULTARGS_dealII               17.7960%

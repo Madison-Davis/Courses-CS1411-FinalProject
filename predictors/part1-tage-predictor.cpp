@@ -82,12 +82,12 @@ UINT64 CountCorrect = 0;
 
 // PART 0: Variables
 #define R           2       // geometric series common ratio: L(i) = (int) (R^(i-1) L(1) + 0.5)
-#define L1          2       // geometric series starting val: L(i) = (int) (R^(i-1) L(1) + 0.5)
-#define NTABLES     4       // # of predictor tables including the base predictor; by default you always have a base predictor
+#define L1          4       // geometric series starting val: L(i) = (int) (R^(i-1) L(1) + 0.5)
+#define NTABLES     7       // # of predictor tables including the base predictor; by default you always have a base predictor
 #define NENTRIES    1024    // # of entries in each table; should be divisible by log_2(#)
 #define PC_BITS     10      // # of lower-bits to use for the PC hashing
 #define TAG_BITS    8       // # of bits for the tag, 2nd hash func should ret # = to this
-#define NHIST       60      // # of bits used for the global history register
+#define NHIST       128     // # of bits used for the global history register
 #define PROB        3       // choose secondary with prob 1/PROB 
 
 
@@ -119,28 +119,29 @@ struct tagged_table
 // PART 2: Globals
 base_table t0;                              // base table, 1 of these
 tagged_table tagged_tables[NTABLES - 1];    // tagged tables, NTABLES - 1 of these
-UINT64 hist = 0;                            // global history, of size NHIST
+__uint128_t hist = 0;                       // global history, of size NHIST
 static int  g_provider = -1;                // index for table providing the prediction: -1 = base, 0..NTABLES-2 = tagged table index
 static bool g_prediction = false;           // prediction given by the table we chose
 static bool g_altpred = false;              // prediction given by the next-lowest matching table, if applicable
 
 
 // PART 3: Helper Functions
-static inline UINT64 hist_mask(int n_hist)
-// Compute a history mask based on n_hist, capping at 64-bits
+static inline __uint128_t hist_mask(int n_hist)
+// Compute a history mask based on n_hist, capping at 128-bits
 {
-    return (n_hist == 0) ? 0ULL
-         : (n_hist >= 64) ? ~0ULL
-         : (1ULL << n_hist) - 1;
+    if (n_hist == 0)   return (__uint128_t)0;
+    if (n_hist >= 128) return ~(__uint128_t)0;
+    return ((__uint128_t)1 << n_hist) - 1;
 }
 
-static int compress_history(UINT64 h, int n_hist, int out_bits)
+static int compress_history(__uint128_t h, int n_hist, int out_bits)
 // Used to fold successive history bits into out_bits width
 // Helpful for hash_index and hash_tag
 // Ex: for n_hist of width out_bits, we do result = h[0:7] XOR h[8:15] XOR h[16:19]
 {
     int result = 0;
-    for (int shift = 0; shift < n_hist; shift += out_bits)
+    int effective = std::min(n_hist, NHIST);
+    for (int shift = 0; shift < effective; shift += out_bits)
     {
         result ^= (int)((h >> shift) & ((1 << out_bits) - 1));
     }
@@ -151,7 +152,7 @@ static int compress_history(UINT64 h, int n_hist, int out_bits)
 static inline int sat_inc(int v, int max) { return (v < max) ? v + 1 : max; }
 static inline int sat_dec(int v)          { return (v > 0)   ? v - 1 : 0;   }
 
-static int hash_index(int pc, UINT64 h, int n_hist)
+static int hash_index(int pc, __uint128_t h, int n_hist)
 // Paper Section 2.4: Hash = PC + folded-history
 // XOR successive PC_BITS-wide chunks of history into low PC bits
 // Ex: to hash 30-bit hist to 10 bits, index = PC[0:9] XOR h[0:9] XOR h[10:19] XOR h[20:29]
@@ -161,7 +162,7 @@ static int hash_index(int pc, UINT64 h, int n_hist)
     return (pc_bits ^ csr) & ((1 << PC_BITS) - 1);
 }
 
-static int hash_tag(int pc, UINT64 h, int n_hist)
+static int hash_tag(int pc, __uint128_t h, int n_hist)
 // Paper Section 2.4: Hash = PC + circular shift register (CSRs)
 // Ex: suppose our hash is 8 bits.  Each tagged table uses CSR1 and CSR2 of width 8 and 8-1=7 bits.
     // index = PC[0:9] XOR CSR1 XOR (CSR2 << 1)
@@ -190,7 +191,7 @@ void tage_init()
         tagged_tables[i].n_hist = (int)(std::pow((double)R, i) * L1);
         for (int k = 0; k < NENTRIES; ++k)
         {
-            tagged_tables[i].entries[k].tag = 0;
+            tagged_tables[i].entries[k].tag = -1; // init tags to impossible bit
             tagged_tables[i].entries[k].pred = 0;
             tagged_tables[i].entries[k].u = 0;
         }
@@ -261,7 +262,7 @@ void tage_update(ADDRINT inst_ptr, bool taken)
             // i.e prefer lower index (shorter history) with ~(PROB-1):1 odds
             int chosen = candidates[0];
             if (n_candidates > 1 && (rand() % PROB == 0))
-                chosen = candidates[1];
+                chosen = candidates[1 + rand() % (n_candidates - 1)];  // random among longer ones
 
             // Find the index to overwrite in the chosen tagged table, then overwrite it
             int n_hist  = tagged_tables[chosen].n_hist;
@@ -286,7 +287,7 @@ void tage_update(ADDRINT inst_ptr, bool taken)
     }
 
     // STEP 3: Shift the global history based on recent branch's outcome
-    hist = (hist << 1) | (taken ? 1ULL : 0ULL);
+    hist = ((hist << 1) | (taken ? (__uint128_t)1 : 0)) & hist_mask(NHIST);
 }
 
 bool tage_predict(ADDRINT inst_ptr)
