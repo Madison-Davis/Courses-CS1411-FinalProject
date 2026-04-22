@@ -92,7 +92,6 @@ UINT64 CountCorrect = 0;
        - Else, decrement all counters in T(j) where i<j<M
 */
 
-
 // PART 0: Variables
 // #define R           2       // geometric series common ratio: L(i) = (int) (R^(i-1) L(1) + 0.5)
 // #define L1          12      // geometric series starting val: L(i) = (int) (R^(i-1) L(1) + 0.5)
@@ -114,7 +113,7 @@ static UINT32 PROB = 3;
 // PART 1: Base and Tagged Predictor Tables
 struct base_table_entry
 {
-    int pred;               // 2-bit satured counter: [0..3]
+    int pred; // 2-bit satured counter: [0..3]
 };
 
 struct base_table
@@ -125,8 +124,8 @@ struct base_table
 struct tagged_table_entry
 {
     int tag;
-    int pred;               // 2-bit satured counter: [0..3]
-    int u;                  // 2-bit satured counter: [0..3]
+    int pred; // 2-bit satured counter: [0..3]
+    int u;    // 2-bit satured counter: [0..3]
 };
 
 struct tagged_table
@@ -135,22 +134,22 @@ struct tagged_table
     int n_hist;
 };
 
-
 // PART 2: Globals
-base_table t0;                              // base table, 1 of these
-std::vector<tagged_table> tagged_tables;    // tagged tables, NTABLES - 1 of these
-__uint128_t hist = 0;                       // global history, of size NHIST
-static int  g_provider = -1;                // index for table providing the prediction: -1 = base, 0..NTABLES-2 = tagged table index
-static bool g_prediction = false;           // prediction given by the table we chose
-static bool g_altpred = false;              // prediction given by the next-lowest matching table, if applicable
-
+base_table t0;                           // base table, 1 of these
+std::vector<tagged_table> tagged_tables; // tagged tables, NTABLES - 1 of these
+__uint128_t hist = 0;                    // global history, of size NHIST
+static int g_provider = -1;              // index for table providing the prediction: -1 = base, 0..NTABLES-2 = tagged table index
+static bool g_prediction = false;        // prediction given by the table we chose
+static bool g_altpred = false;           // prediction given by the next-lowest matching table, if applicable
 
 // PART 3: Helper Functions
 static inline __uint128_t hist_mask(int n_hist)
 // Compute a history mask based on n_hist, capping at 128-bits
 {
-    if (n_hist == 0)   return (__uint128_t)0;
-    if (n_hist >= 128) return ~(__uint128_t)0;
+    if (n_hist == 0)
+        return (__uint128_t)0;
+    if (n_hist >= 128)
+        return ~(__uint128_t)0;
     return ((__uint128_t)1 << n_hist) - 1;
 }
 
@@ -168,28 +167,28 @@ static int compress_history(__uint128_t h, int n_hist, int out_bits)
     return result;
 }
 
-// Helpful functions to increment or decrement saturated counters (pred or u) 
+// Helpful functions to increment or decrement saturated counters (pred or u)
 static inline int sat_inc(int v, int max) { return (v < max) ? v + 1 : max; }
-static inline int sat_dec(int v)          { return (v > 0)   ? v - 1 : 0;   }
+static inline int sat_dec(int v) { return (v > 0) ? v - 1 : 0; }
 
 static int hash_index(int pc, __uint128_t h, int n_hist)
 // Paper Section 2.4: Hash = PC + folded-history
 // XOR successive PC_BITS-wide chunks of history into low PC bits
 // Ex: to hash 30-bit hist to 10 bits, index = PC[0:9] XOR h[0:9] XOR h[10:19] XOR h[20:29]
 {
-    int pc_bits = pc & ((1 << PC_BITS) - 1);                // Ex: PC[0:9]
-    int csr     = compress_history(h, n_hist, PC_BITS);     // Ex: h[0:9] XOR h[10:19] XOR h[20:29]
+    int pc_bits = pc & ((1 << PC_BITS) - 1);        // Ex: PC[0:9]
+    int csr = compress_history(h, n_hist, PC_BITS); // Ex: h[0:9] XOR h[10:19] XOR h[20:29]
     return (pc_bits ^ csr) & ((1 << PC_BITS) - 1);
 }
 
 static int hash_tag(int pc, __uint128_t h, int n_hist)
 // Paper Section 2.4: Hash = PC + circular shift register (CSRs)
 // Ex: suppose our hash is 8 bits.  Each tagged table uses CSR1 and CSR2 of width 8 and 8-1=7 bits.
-    // index = PC[0:9] XOR CSR1 XOR (CSR2 << 1)
+// index = PC[0:9] XOR CSR1 XOR (CSR2 << 1)
 {
     int pc_bits = pc & ((1 << TAG_BITS) - 1);
-    int csr1    = compress_history(h, n_hist, TAG_BITS);
-    int csr2    = compress_history(h, n_hist, TAG_BITS - 1);
+    int csr1 = compress_history(h, n_hist, TAG_BITS);
+    int csr2 = compress_history(h, n_hist, TAG_BITS - 1);
     return (pc_bits ^ csr1 ^ (csr2 << 1)) & ((1 << TAG_BITS) - 1);
 }
 
@@ -206,21 +205,23 @@ void tage_init()
     PROB = KnobProb.Value();
 
     // Base predictor table
-    for (int k = 0; k < NENTRIES; ++k)
+    to.entries.resize(NENTRIES);
+    for (int k = 0; k < (int)NENTRIES; ++k)
         t0.entries[k].pred = 0;
 
     // Tagged predictor tables
-    for (int i = 0; i < NTABLES - 1; ++i)
+    for (int i = 0; i < (int)NTABLES - 1; ++i)
     {
-        tagged_tables.resize(NTABLES-1);
+        tagged_tables.resize(NTABLES - 1);
         // Geometric series
         // L(i) = (int)(R^(i-1) * L1 + 0.5) assumes i starts at 1
         // Therefore, since our i=0, L(i+1) = (int)(R^(i) * L1 + 0.5)
         // can omit the +0.5 because we are working strictly with int params
         tagged_tables[i].n_hist = (int)(std::pow((double)R, i) * L1);
-        for (int k = 0; k < NENTRIES; ++k)
+        for (int k = 0; k < (int)NENTRIES; ++k)
         {
-            if (k==0){
+            if (k == 0)
+            {
                 tagged_tables[i].entries.resize(NENTRIES);
             }
             tagged_tables[i].entries[k].tag = -1; // init tags to impossible bit
@@ -241,27 +242,28 @@ void tage_update(ADDRINT inst_ptr, bool taken)
         // Base table predictor
         // Update the prediction counter based on if right or wrong, capping at [0...3]
         int idx = pc & (NENTRIES - 1);
-        t0.entries[idx].pred = taken ? sat_inc(t0.entries[idx].pred, 3) 
-                                     : sat_dec(t0.entries[idx].pred);   
+        t0.entries[idx].pred = taken ? sat_inc(t0.entries[idx].pred, 3)
+                                     : sat_dec(t0.entries[idx].pred);
     }
     else
     {
         // Tagged table predictor
         // Update the prediction counter based on if right or wrong, capping at [0...3]
-        int n_hist              = tagged_tables[g_provider].n_hist;
-        int idx                 = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-        tagged_table_entry& e   = tagged_tables[g_provider].entries[idx];
-        e.pred                  = taken ? sat_inc(e.pred, 3) : sat_dec(e.pred);
-        
+        int n_hist = tagged_tables[g_provider].n_hist;
+        int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+        tagged_table_entry &e = tagged_tables[g_provider].entries[idx];
+        e.pred = taken ? sat_inc(e.pred, 3) : sat_dec(e.pred);
+
         // Update useful counter u
         // Increment when provider correct AND alt wrong
         // Decrement when provider wrong AND alt correct
-        bool provider_correct   = (g_prediction == taken);
-        bool alt_correct        = (g_altpred    == taken);
-        if (provider_correct && !alt_correct) 
+        bool provider_correct = (g_prediction == taken);
+        bool alt_correct = (g_altpred == taken);
+        if (provider_correct && !alt_correct)
         {
             e.u = sat_inc(e.u, 3);
-        } else if (!provider_correct && alt_correct)
+        }
+        else if (!provider_correct && alt_correct)
         {
             e.u = sat_dec(e.u);
         }
@@ -277,13 +279,14 @@ void tage_update(ADDRINT inst_ptr, bool taken)
         int start = (g_provider == -1) ? 0 : g_provider + 1;
 
         // Collect potential candidates for eviction across matching tagged table indices, where u == 0
-        int  candidates[NTABLES];
-        int  n_candidates = 0;
-        for (int j = start; j < NTABLES - 1; ++j)
+        int candidates[NTABLES];
+        int n_candidates = 0;
+        for (int j = start; j < (int)NTABLES - 1; ++j)
         {
-            int n_hist   = tagged_tables[j].n_hist;
-            int idx      = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-            if (tagged_tables[j].entries[idx].u == 0) candidates[n_candidates++] = j;
+            int n_hist = tagged_tables[j].n_hist;
+            int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+            if (tagged_tables[j].entries[idx].u == 0)
+                candidates[n_candidates++] = j;
         }
 
         // If we have a candidate for eviction (exists u = 0)...
@@ -294,25 +297,25 @@ void tage_update(ADDRINT inst_ptr, bool taken)
             // i.e prefer lower index (shorter history) with ~(PROB-1):1 odds
             int chosen = candidates[0];
             if (n_candidates > 1 && (rand() % PROB == 0))
-                chosen = candidates[1 + rand() % (n_candidates - 1)];  // random among longer ones
+                chosen = candidates[1 + rand() % (n_candidates - 1)]; // random among longer ones
 
             // Find the index to overwrite in the chosen tagged table, then overwrite it
-            int n_hist  = tagged_tables[chosen].n_hist;
-            int idx     = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-            int tag     = hash_tag (pc, hist & hist_mask(n_hist), n_hist);
+            int n_hist = tagged_tables[chosen].n_hist;
+            int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+            int tag = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
 
-            tagged_tables[chosen].entries[idx].tag  = tag;
+            tagged_tables[chosen].entries[idx].tag = tag;
             tagged_tables[chosen].entries[idx].pred = taken ? 2 : 1; // start in weak state!
-            tagged_tables[chosen].entries[idx].u    = 0;
+            tagged_tables[chosen].entries[idx].u = 0;
         }
         // If we don't have a candidate for eviction (no u = 0)...
         else
         {
             // No free slot: decrement matching pc-hashed u in all longer tables
-            for (int j = start; j < NTABLES - 1; ++j)
+            for (int j = start; j < (int)NTABLES - 1; ++j)
             {
-                int n_hist  = tagged_tables[j].n_hist;
-                int idx     = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+                int n_hist = tagged_tables[j].n_hist;
+                int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
                 tagged_tables[j].entries[idx].u = sat_dec(tagged_tables[j].entries[idx].u);
             }
         }
@@ -328,17 +331,17 @@ bool tage_predict(ADDRINT inst_ptr)
     int pc = (int)(inst_ptr & ((1 << PC_BITS) - 1));
 
     // Default: base predictor
-    g_provider   = -1;
+    g_provider = -1;
     g_prediction = (t0.entries[pc & (NENTRIES - 1)].pred >= 2);
-    g_altpred    = g_prediction;
+    g_altpred = g_prediction;
     bool found_provider = false;
 
     // Walk longest => shortest
     for (int i = NTABLES - 2; i >= 0; --i)
     {
-        int n_hist   = tagged_tables[i].n_hist;
+        int n_hist = tagged_tables[i].n_hist;
         int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-        int tag = hash_tag  (pc, hist & hist_mask(n_hist), n_hist);
+        int tag = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
 
         // If we found a match...
         if (tagged_tables[i].entries[idx].tag == tag)
@@ -346,8 +349,8 @@ bool tage_predict(ADDRINT inst_ptr)
             if (!found_provider)
             {
                 // First (longest) hit: this is our provider!
-                g_provider    = i;
-                g_prediction  = (tagged_tables[i].entries[idx].pred >= 2);
+                g_provider = i;
+                g_prediction = (tagged_tables[i].entries[idx].pred >= 2);
                 found_provider = true;
             }
             else
@@ -406,7 +409,7 @@ VOID br_predict(ADDRINT ins_ptr, INT32 taken)
     }
 
     // Count the correctly predicted branches
-    if (tage_predict(ins_ptr) == (bool) taken)
+    if (tage_predict(ins_ptr) == (bool)taken)
         CountCorrect++;
 
     // Update TAGE
