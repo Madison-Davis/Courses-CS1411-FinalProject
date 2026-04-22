@@ -82,11 +82,11 @@ UINT64 CountCorrect = 0;
 
 // PART 0: Variables
 #define R           2       // geometric series common ratio: L(i) = (int) (R^(i-1) L(1) + 0.5)
-#define L1          4       // geometric series starting val: L(i) = (int) (R^(i-1) L(1) + 0.5)
-#define NTABLES     7       // # of predictor tables including the base predictor; by default you always have a base predictor
-#define NENTRIES    1024    // # of entries in each table; should be divisible by log_2(#)
-#define PC_BITS     10      // # of lower-bits to use for the PC hashing
-#define TAG_BITS    8       // # of bits for the tag, 2nd hash func should ret # = to this
+#define L1          12      // geometric series starting val: L(i) = (int) (R^(i-1) L(1) + 0.5)
+#define NTABLES     10      // # of predictor tables including the base predictor; by default you always have a base predictor
+#define NENTRIES    4096    // # of entries in each table; should be divisible by log_2(#)
+#define PC_BITS     12      // # of lower-bits to use for the PC hashing
+#define TAG_BITS    10      // # of bits for the tag, 2nd hash func should ret # = to this
 #define NHIST       128     // # of bits used for the global history register
 #define PROB        3       // choose secondary with prob 1/PROB 
 

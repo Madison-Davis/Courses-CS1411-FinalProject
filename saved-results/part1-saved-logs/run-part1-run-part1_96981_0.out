@@ -1,9 +1,9 @@
-=== Job 96960_0 ===
+=== Job 96981_0 ===
     Pintool:   2bit-bht  (predictors/obj-intel64/part1-2bitbht-predictor.so)
-    Args:      -r 64 -p 4
+    Args:      -r 512 -p 512
     Benchmark: dealII  (./benchmarks/dealII_O3 10)
     Output:    saved-results/part1/2bit-bht_DEFAULTARGS_dealII.out
-    Started:   Wed Apr 22 15:52:01 UTC 2026
+    Started:   Wed Apr 22 17:30:06 UTC 2026
 Refinement cycle: 0
    Number of degrees of freedom=79
    Point value=0.111419
@@ -49,4 +49,4 @@ Refinement cycle: 10
    Point value=0.107025
    Estimated error=-0.000162701
 
-=== Done: Wed Apr 22 15:56:44 UTC 2026 ===
+=== Done: Wed Apr 22 17:34:55 UTC 2026 ===
