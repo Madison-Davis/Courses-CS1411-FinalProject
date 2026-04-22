@@ -88,6 +88,7 @@ UINT64 CountCorrect = 0;
 #define PC_BITS     10      // # of lower-bits to use for the PC hashing
 #define TAG_BITS    8       // # of bits for the tag, 2nd hash func should ret # = to this
 #define NHIST       60      // # of bits used for the global history register
+#define PROB        3       // choose secondary with prob 1/PROB 
 
 
 // PART 1: Base and Tagged Predictor Tables
@@ -185,7 +186,8 @@ void tage_init()
         // Geometric series
         // L(i) = (int)(R^(i-1) * L1 + 0.5) assumes i starts at 1
         // Therefore, since our i=0, L(i+1) = (int)(R^(i) * L1 + 0.5)
-        tagged_tables[i].n_hist = (int)(std::pow((double)R, i) * L1 + 0.5);
+        // can omit the +0.5 because we are working strictly with int params
+        tagged_tables[i].n_hist = (int)(std::pow((double)R, i) * L1);
         for (int k = 0; k < NENTRIES; ++k)
         {
             tagged_tables[i].entries[k].tag = 0;
@@ -256,9 +258,9 @@ void tage_update(ADDRINT inst_ptr, bool taken)
         {
             // If we have several candidates for eviction, choose the table with shorter history
             // with higher probability (paper does not specify probability, let's do 2:1 odds)
-            // i.e prefer lower index (shorter history) with ~2:1 odds
+            // i.e prefer lower index (shorter history) with ~(PROB-1):1 odds
             int chosen = candidates[0];
-            if (n_candidates > 1 && (rand() % 3 == 0))
+            if (n_candidates > 1 && (rand() % PROB == 0))
                 chosen = candidates[1];
 
             // Find the index to overwrite in the chosen tagged table, then overwrite it
