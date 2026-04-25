@@ -401,10 +401,10 @@ bool tage_predict(ADDRINT inst_ptr)
                 // Specifically, use integer comparison: switch if rand() % provider < alt
                 int provider_len = tagged_tables[g_provider].n_hist;
                 int alt_len      = tagged_tables[alt_table].n_hist;
-                if (provider_len > 0 && (rand() % provider_len) < alt_len)
+                if (provider_len > 0 && (rand() % provider_len) >= alt_len)
                 {
-                    g_provider   = alt_table;
-                    g_prediction = g_altpred;
+                 g_provider   = alt_table;
+                 g_prediction = g_altpred;
                 }
             }
         }

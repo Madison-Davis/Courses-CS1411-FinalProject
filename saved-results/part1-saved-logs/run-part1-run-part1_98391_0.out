@@ -1,12 +1,12 @@
-=== Job 96306_7 ===
+=== Job 98391_0 ===
     Pintool:   tage  (predictors/obj-intel64/part1-tage-predictor.so)
-    Args:      <none>
+    Args:      -L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3
     Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
-    Output:    saved-results/part1/tage_DEFAULTARGS_quantum.out
-    Started:   Wed Apr 22 01:52:19 UTC 2026
+    Output:    saved-results/part2/tage_DEFAULTARGS_quantum.out
+    Started:   Sat Apr 25 19:50:01 UTC 2026
 N = 400, 47 qubits required
 Random seed: 333
 Measured 131072 (0.500000), fractional approximation is 1/2.
 Possible period is 2.
 400 = 4 * 100
-=== Done: Wed Apr 22 02:03:08 UTC 2026 ===
+=== Done: Sat Apr 25 20:53:19 UTC 2026 ===

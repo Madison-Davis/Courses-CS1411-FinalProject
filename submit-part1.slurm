@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=run-part1
 #SBATCH --partition=general
-#SBATCH --time=1:00:00
+#SBATCH --time=6:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --output=run-part1-%x_%A_%a.out
@@ -19,7 +19,7 @@ PINTOOLS=(
     predictors/obj-intel64/part1-tage-predictor.so
 )
 PINTOOL_NAMES=("1bit" "2bit" "2bit-bht" "tage")
-PINTOOL_ARGS=("-s 1024" "-s 1024" "-r 512 -p 512" "")
+PINTOOL_ARGS=("-s 1024" "-s 1024" "-r 512 -p 512" "-L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3")
 BENCHMARKS=(
     ./benchmarks/dealII_O3
     ./benchmarks/libquantum_O3
