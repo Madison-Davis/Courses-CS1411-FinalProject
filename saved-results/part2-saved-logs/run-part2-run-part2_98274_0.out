@@ -1,0 +1,12 @@
+=== Job 98274_0 ===
+    Pintool:   tage-custom-histoverfit  (predictors/obj-intel64/part2-tage-custom-histoverfit-predictor.so)
+    Args:      -L1 12 -R 2 -ntables 10 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part2/tage-custom-histoverfit_DEFAULTARGS_quantum.out
+    Started:   Sat Apr 25 00:41:38 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Sat Apr 25 02:50:30 UTC 2026 ===

@@ -6,22 +6,22 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --output=run-part2-%x_%A_%a.out
 #SBATCH --error=run-part2-%x_%A_%a.err
-#SBATCH --array=0-1   # 2 pintools x 1 benchmarks = 2 combos (0-1)
+#SBATCH --array=0   # 1 pintool x 1 benchmarks = 1 combo
 
 cd "$SLURM_SUBMIT_DIR" || exit 1
 export PIN_ROOT=/shared/courseSharedFolders/162593outer/162593/spack/opt/spack/linux-cascadelake/intel-pin-3.31-icrnczcau2lf67etmw5jlzavqlz2hdug
 
 # Tools and Benchmarks
 PINTOOLS=(
-    predictors/obj-intel64/part1-tage-predictor.so
-    predictors/obj-intel64/part2-tage-custom-confidence-predictor.so 
+    # predictors/obj-intel64/part1-tage-predictor.so
+    predictors/obj-intel64/part2-tage-custom-histoverfit-predictor.so
     # TODO: change this to your specific .so file!
     # to do that, (1) add your custom .cpp file to the makefile.rules, and then (2) execute 'make' from the predictors directory to compile 
 )
-PINTOOL_NAMES=("tage" "tage-custom-confidence") # TODO: change the custom one to your name!
+PINTOOL_NAMES=("tage-custom-histoverfit") # TODO: change the custom one to your name!
 PINTOOL_ARGS=(
-    "-L1 12 -R 2 -ntables 10 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # NOTE: this is our baseline set!
-    "-L1 12 -R 2 -ntables 10 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" 
+    "-L1 12 -R 2 -ntables 10 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # NOTE: keep the same!
+    # "-L1 12 -R 2 -ntables 10 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # NOTE: keep uncommented!
 )
 BENCHMARKS=(
     #./benchmarks/dealII_O3 # TODO: for early testing, only need to do libquantum... if libquantum shows custom is better, try dealII!
