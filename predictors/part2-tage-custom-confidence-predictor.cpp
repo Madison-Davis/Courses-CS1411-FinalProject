@@ -4,6 +4,7 @@
 #include <fstream>
 #include <map>
 #include <cstdlib>
+#include <vector>
 #include "pin.H"
 #include <cmath>
 
@@ -18,8 +19,8 @@ using std::string;
 /* ===================================================================== */
 KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
                             "o", "hw3.out", "specify output file name");
-KNOB<BOOL> KnobPid(KNOB_MODE_WRITEONCE, "pintool",
-                   "i", "0", "append pid to output");
+KNOB<BOOL>   KnobPid(KNOB_MODE_WRITEONCE, "pintool",
+                     "i", "0", "append pid to output");
 KNOB<UINT64> KnobBranchLimit(KNOB_MODE_WRITEONCE, "pintool",
                              "l", "0", "set limit of branches analyzed");
 KNOB<UINT32> KnobL1(KNOB_MODE_WRITEONCE, "pintool",
@@ -40,8 +41,8 @@ KNOB<UINT32> KnobProb(KNOB_MODE_WRITEONCE, "pintool",
 /* ===================================================================== */
 /* Global Variables */
 /* ===================================================================== */
-UINT64 CountSeen = 0;
-UINT64 CountTaken = 0;
+UINT64 CountSeen    = 0;
+UINT64 CountTaken   = 0;
 UINT64 CountCorrect = 0;
 
 /* ===================================================================== */
@@ -93,6 +94,34 @@ UINT64 CountCorrect = 0;
        - Else, decrement all counters in T(j) where i<j<M
 */
 
+/*
+[Extension: Confidence Mechanism]
+  1. Run the standard TAGE walk (longest -> shortest) to find the provider and altpred.
+  2. If a tagged provider was found, continue walking the remaining shorter tables
+     to collect every additional tag-match ("voters").
+  3. Include the base predictor as a voter (weight = 1).
+  4. Each tagged voter contributes a weight of (u + 1): adding 1 so that a freshly
+     allocated entry (u = 0) still casts a vote.
+  5. Confidence = (# voters that agree with provider) / (total # voters).
+  6. High Confidence  (confidence >= CONF_THRESHOLD  AND  voters >= CONF_MIN_VOTERS):
+       Trust the long-history provider — identical to baseline behavior.
+  7. Low Confidence   (confidence <  CONF_THRESHOLD  AND  voters >= CONF_MIN_VOTERS):
+       Override with a u-weighted majority vote across ALL matching tables.
+       This protects against long-history over-fitting to rare patterns.
+  8. If fewer than CONF_MIN_VOTERS shorter tables matched, skip confidence logic
+       and fall back to the provider directly (not enough evidence either way).
+[Notes]
+  1. All update logic is identical to baseline TAGE.
+  2. g_provider always reflects the table whose prediction was USED (the final one
+    after confidence override), so u-counter updates remain meaningful.
+*/
+
+/* ===================================================================== */
+/* Extension: Confidence Parameters                                      */
+/* ===================================================================== */
+#define CONF_THRESHOLD  0.6   // fraction of agreeing voters => high confidence
+#define CONF_MIN_VOTERS 2     // minimum voters needed to apply confidence logic
+
 /* ===================================================================== */
 /* Runtime-Configurable TAGE Parameters                                  */
 /* ===================================================================== */
@@ -110,7 +139,7 @@ static UINT32 PROB          = 3;
 /* ===================================================================== */
 struct base_table_entry
 {
-    int pred; // 2-bit satured counter: [0..3]
+    int pred;   // 2-bit saturated counter [0..3]
 };
 
 struct base_table
@@ -121,8 +150,8 @@ struct base_table
 struct tagged_table_entry
 {
     int tag;
-    int pred; // 2-bit satured counter: [0..3]
-    int u;    // 2-bit satured counter: [0..3]
+    int pred;   // 2-bit saturated counter [0..3]
+    int u;      // 2-bit useful counter    [0..3]
 };
 
 struct tagged_table
@@ -210,9 +239,9 @@ void tage_init()
         t0.entries[k].pred = 0;
 
     // Tagged predictor tables
+    tagged_tables.resize(NTABLES - 1);
     for (int i = 0; i < (int)NTABLES - 1; ++i)
     {
-        tagged_tables.resize(NTABLES - 1);
         // Geometric series
         // L(i) = (int)(R^(i-1) * L1 + 0.5) assumes i starts at 1
         // Therefore, since our i=0, L(i+1) = (int)(R^(i) * L1 + 0.5)
@@ -325,23 +354,25 @@ void tage_update(ADDRINT inst_ptr, bool taken)
     hist = ((hist << 1) | (taken ? (__uint128_t)1 : 0)) & hist_mask(NHIST);
 }
 
+
 bool tage_predict(ADDRINT inst_ptr)
 // Predict using TAGE
 {
     int pc = (int)(inst_ptr & ((1 << PC_BITS) - 1));
 
     // Default: base predictor
-    g_provider = -1;
+    g_provider   = -1;
     g_prediction = (t0.entries[pc & (NENTRIES - 1)].pred >= 2);
-    g_altpred = g_prediction;
+    g_altpred    = g_prediction;
     bool found_provider = false;
 
+    // Pass 1 (baseline): walk longest => shortest to find provider + altpred
     // Walk longest => shortest
-    for (int i = NTABLES - 2; i >= 0; --i)
+    for (int i = (int)NTABLES - 2; i >= 0; --i)
     {
         int n_hist = tagged_tables[i].n_hist;
-        int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-        int tag = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
+        int idx    = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+        int tag    = hash_tag  (pc, hist & hist_mask(n_hist), n_hist);
 
         // If we found a match...
         if (tagged_tables[i].entries[idx].tag == tag)
@@ -349,8 +380,8 @@ bool tage_predict(ADDRINT inst_ptr)
             if (!found_provider)
             {
                 // First (longest) hit: this is our provider!
-                g_provider = i;
-                g_prediction = (tagged_tables[i].entries[idx].pred >= 2);
+                g_provider    = i;
+                g_prediction  = (tagged_tables[i].entries[idx].pred >= 2);
                 found_provider = true;
             }
             else
@@ -361,6 +392,89 @@ bool tage_predict(ADDRINT inst_ptr)
             }
         }
     }
+
+    // If no tagged table matched, base predictor is sufficient: skip confidence
+    if (!found_provider)
+        return g_prediction;
+
+    // Pass 2 (confidence): collect voters from ALL shorter-history tables
+    // that have a tag match, plus the base predictor
+    int n_agree           = 0;  // voters agreeing with provider
+    int n_voters          = 0;  // total voters (shorter tagged matches + base)
+    int weighted_taken    = 0;  // sum of u-weights voting "taken"
+    int weighted_nottaken = 0;  // sum of u-weights voting "not taken"
+
+    // Walk shorter tagged tables (indices 0 ... g_provider-1)
+    for (int i = g_provider - 1; i >= 0; --i)
+    {
+        int n_hist = tagged_tables[i].n_hist;
+        int idx    = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+        int tag    = hash_tag  (pc, hist & hist_mask(n_hist), n_hist);
+        if (tagged_tables[i].entries[idx].tag == tag)
+        {
+            bool voter_pred = (tagged_tables[i].entries[idx].pred >= 2);
+            int  weight     = tagged_tables[i].entries[idx].u + 1; // u = 0 still votes
+            if (voter_pred)
+                weighted_taken    += weight;
+            else
+                weighted_nottaken += weight;
+            if (voter_pred == g_prediction)
+                n_agree++;
+            n_voters++;
+        }
+    }
+
+    // Base predictor as a voter (weight = 1)
+    {
+        bool base_pred = (t0.entries[pc & (NENTRIES - 1)].pred >= 2);
+        if (base_pred)
+            weighted_taken    += 1;
+        else
+            weighted_nottaken += 1;
+        if (base_pred == g_prediction)
+            n_agree++;
+        n_voters++;
+    }
+
+    // Include the provider itself in the weighted vote pool
+    // (weight = u + 1, naturally votes for its own prediction)
+    {
+        int n_hist = tagged_tables[g_provider].n_hist;
+        int idx    = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+        int weight = tagged_tables[g_provider].entries[idx].u + 1;
+        if (g_prediction)
+            weighted_taken    += weight;
+        else
+            weighted_nottaken += weight;
+    }
+
+    // Confidence decision
+    if (n_voters >= CONF_MIN_VOTERS)
+    {
+        double confidence = (double)n_agree / (double)n_voters;
+        if (confidence >= CONF_THRESHOLD)
+        {
+            // High Confidence: shorter tables mostly agree with the provider.
+            // Trust the long-history provider: g_prediction already correct.
+        }
+        else
+        {
+            // Low Confidence: shorter tables disagree with the provider.
+            // Fall back to u-weighted majority vote across all matching tables.
+            // This guards against the long-history table latching onto a rare
+            // coincidental pattern.
+            bool override_pred = (weighted_taken > weighted_nottaken);
+            // Only override if the vote is decisive (not a tie)
+            if (weighted_taken != weighted_nottaken && override_pred != g_prediction)
+            {
+                // Shift g_provider to -1 so tage_update credits/debits the
+                // base predictor path, keeping u-counter semantics consistent.
+                g_provider   = -1;
+                g_prediction = override_pred;
+            }
+        }
+    }
+    // If n_voters < CONF_MIN_VOTERS: insufficient evidence: keep provider as-is.
     return g_prediction;
 }
 
@@ -468,20 +582,15 @@ VOID Fini(int n, void *v)
 /* ===================================================================== */
 int main(int argc, char *argv[])
 {
-
     if (PIN_Init(argc, argv))
-    {
         return Usage();
-    }
 
-    // TODO: initiate TAGE predictor!
     tage_init();
 
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
 
     PIN_StartProgram();
-
     return 0;
 }
 
