@@ -1,0 +1,12 @@
+=== Job 98473_0 ===
+    Pintool:   tage-custom-pcbias  (predictors/obj-intel64/part2-tage-custom-pcbias-predictor.so)
+    Args:      -L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part2/tage-custom-pcbias_DEFAULTARGS_V1_quantum.out
+    Started:   Sat Apr 25 22:36:38 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Sat Apr 25 22:43:51 UTC 2026 ===

@@ -16,11 +16,11 @@ export PIN_ROOT=/shared/courseSharedFolders/162593outer/162593/spack/opt/spack/l
 # TODO: change this to your specific .so file!
 # to do that, (1) add your custom .cpp file to the makefile.rules, and then (2) execute 'make' from the predictors directory to compile 
 PINTOOLS=(
-    predictors/obj-intel64/part2-tage-custom-histoverfit-predictor.so   
+    predictors/obj-intel64/part2-tage-custom-confidence-predictor.so
 )
 # TODO: change this to reflect your custom file name!
 PINTOOL_NAMES=(
-    "tage"
+    "tage-custom-confidence"
 ) 
 # NOTE: DO NOT CHANGE!
 # If you are testing more than 1 pintool at a time, make copies of this string
