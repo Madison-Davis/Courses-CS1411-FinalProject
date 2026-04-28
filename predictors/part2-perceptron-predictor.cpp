@@ -148,6 +148,43 @@ void perceptron_update(ADDRINT pc, bool taken)
     GHR[0] = t;
 }
 
+/*
+============================= INITIALIZATION =============================
+
+Initialize perceptron predictor structures.
+
+1. Set predictor parameters
+2. Initialize GHR to all NOT TAKEN (-1)
+3. Initialize perceptron table
+    - weights[0] = bias weight
+    - weights[1..HISTORY_LEN] = history correlation weights
+4. Initialize all weights to 0
+
+Cold-start behavior matches the paper.
+*/
+
+void perceptron_init()
+{
+    GHR.resize(HISTORY_LEN);
+
+    for(int i = 0; i < HISTORY_LEN; i++)
+    {
+        GHR[i] = -1;
+    }
+
+    perceptron_table.resize(NUM_PERCEPTRONS);
+
+    for(int i = 0; i < NUM_PERCEPTRONS; i++)
+    {
+        perceptron_table[i].resize(HISTORY_LEN + 1);
+
+        for(int j = 0; j <= HISTORY_LEN; j++)
+        {
+            perceptron_table[i][j] = 0;
+        }
+    }
+}
+
 /* ===================================================================== */
 /* Helper Functions                                                      */
 /* ===================================================================== */
@@ -257,7 +294,7 @@ int main(int argc, char *argv[])
         return Usage();
     }
 
-    // TODO: initiate paper predictor!
+    perceptron_init();
 
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
