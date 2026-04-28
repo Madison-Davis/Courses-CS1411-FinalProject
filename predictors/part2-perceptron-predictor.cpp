@@ -33,45 +33,79 @@ UINT64 CountCorrect = 0;
 
 
 /* ===================================================================== */
-/* Perceptron Branch Predictor                                           */
+/* WRITTEN: Perceptron Branch Predictor                                  */
 /* Based on: "Dynamic Branch Prediction with Perceptrons"                */
 /* ===================================================================== */
 
-// ============================ PARAMETERS ==============================
-const int HISTORY_LEN = 32;                       // GHR bits (28 for 4KB budget, 59-62 for larger)
-const int NUM_PERCEPTRONS = 256;                  // Size of perceptron table
-const int THETA = (int)(1.93 * HISTORY_LEN + 14); // Training threshold from paper (empirically derived)
-
-// Saturation bounds for weights, paper used 7-9 bit signed weights
-const int WEIGHT_MAX = 127;
-const int WEIGHT_MIN = -127;
-
 /*
-============================ DATA STRUCTURES ============================
-1. Global History Register (GHR): outcomes of the HISTORY_LEN most recent branches
-   - +1 = taken
-   - -1 = not taken
-   - Initialized to "not taken" (-1)
+[How Perceptron Works]
+[Overview]
+You have a PC, a global history register (GHR) of n bits, and a table of N rows.
+- Each row in the table holds a vector of weights (w1...wn) representing a perceptron.
+- These weights are learned through training
+- A large weight means there is correlation
+- A weight close to 0 means there is little correlation
+- A positive weight indicates we predict taken, negative not taken
+
+[How a prediction and update step works]
+- First, take the PC and hash it to give you an index into the table.
+- Select the row you indexed into: this gives you a perceptron, represented by its weights w1...wn
+- Compute the dot product of these weights with the bits of the global history register to get a number.
+- If the number > 0 predict taken, otherwise not taken.
+- Compare the prediction with the actual.
+- Run the training algorithm given the results (did we get it right, and was our dot product result)
+
+[What does the training step look like]
+- basically, only do the training if our prediction (taken/not taken) does not match what actually happened
+- OR if our prediction is too weak/not confident enough (below some threshold theta)
+if sign(y_out) != t or |y_out| <= theta then
+    for i in range(0, n) do
+        wi = wi + t xi
+    end for
+end if
+
 */
 
+/* ===================================================================== */
+/* Runtime-Configurable Perceptron Parameters                            */
+/* ===================================================================== */
+const int HISTORY_LEN       = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
+const int NUM_PERCEPTRONS   = 256;                              // size of perceptron table
+const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
+const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
+const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
+
+
+/* ===================================================================== */
+/* Table Structures                                                      */
+/* ===================================================================== */
+/* 1. Global History Register (GHR): outcomes of the HISTORY_LEN most recent branches
+    - +1 = taken
+    - -1 = not taken
+    - Initialized to "not taken" (-1)
+*/
 std::vector<int> GHR(HISTORY_LEN, -1);
 
-/*
-2. Perceptron Table
+/* 2. Perceptron Table
    - NUM_PERCEPTRONS rows
    - Indexed by branch PC
    - Each perceptron contains:
-        weights[0] = bias weight
-        weights[1..HISTORY_LEN] = history correlation weights
+        weights[0] = bias weight, always 1 (from the paper)
+        weights[1...HISTORY_LEN] = history correlation weights
    - Initialized to all 0s
 */
-
 std::vector<std::vector<int>> perceptron_table(
     NUM_PERCEPTRONS,
     std::vector<int>(HISTORY_LEN + 1, 0)
 );
 
-// Saturating add helper function to keep weights within bounds
+
+/* ===================================================================== */
+/* Perceptron Functions                                                  */
+/* ===================================================================== */
+/*  saturate
+    add helper function to keep weights within bounds
+*/
 int saturate(int value)
 {
     if(value > WEIGHT_MAX) return WEIGHT_MAX;
@@ -79,47 +113,46 @@ int saturate(int value)
     return value;
 }
 
-/*
-============================ PREDICTION RULE ============================
-3. Dot-product prediction
-    y = weights[0] + SUM(GHR[i] * weights[i])
+/*  perceptron_output
+    Perform dot-product rule for prediction
+    y  = weights[0] + SUM(GHR[i] * weights[i])
     if y >= 0 => predict TAKEN
     else      => predict NOT TAKEN
 */
-
 int perceptron_output(ADDRINT pc)
 {
-    int index = pc % NUM_PERCEPTRONS; // Modulo indexing into perceptron table
+    // Modulo indexing into perceptron table
+    int index = pc % NUM_PERCEPTRONS; 
     std::vector<int>& weights = perceptron_table[index];
-    int y = weights[0]; // Start with bias weight
-
+    // Start with bias weight
+    int y = weights[0]; 
     // Add all correlation terms
     for(int i = 0; i < HISTORY_LEN; i++)
     {
         y += weights[i + 1] * GHR[i];
     }
-
     return y;
 }
 
+/*  perceptron_prediction
+    return true/false prediction
+*/  
 bool perceptron_prediction(ADDRINT pc)
 {
     int y = perceptron_output(pc);
     return (y >= 0);
 }
 
-/*
-============================== UPDATE RULE ==============================
-4. Perceptron learning rule
+/* perceptron_update
+   - Perceptron learning rule
    - Train if: prediction was wrong OR confidence was low (|y| <= THETA)
    - Perceptron update rule: weight[i] = weight[i] + t * x[i]
      where:
         t  = actual branch outcome (+1 or -1)
         x[0] = 1 (bias input)
         x[i] = GHR[i-1] for i > 0 (history bits)
-5. Always update GHR with actual outcome after training
+   - always update GHR with actual outcome after training
 */
-
 void perceptron_update(ADDRINT pc, bool taken)
 {
     int index = pc % NUM_PERCEPTRONS;
@@ -148,21 +181,16 @@ void perceptron_update(ADDRINT pc, bool taken)
     GHR[0] = t;
 }
 
-/*
-============================= INITIALIZATION =============================
-
-Initialize perceptron predictor structures.
-
-1. Set predictor parameters
-2. Initialize GHR to all NOT TAKEN (-1)
-3. Initialize perceptron table
-    - weights[0] = bias weight
-    - weights[1..HISTORY_LEN] = history correlation weights
-4. Initialize all weights to 0
-
-Cold-start behavior matches the paper.
+/*  perceptron_init
+    - initialize perceptron predictor structures.
+    - Set predictor parameters
+    - Initialize GHR to all NOT TAKEN (-1)
+    - Initialize perceptron table
+        - weights[0] = bias weight
+        - weights[1..HISTORY_LEN] = history correlation weights
+    - Initialize all weights to 0
+    - Cold-start behavior matches the paper
 */
-
 void perceptron_init()
 {
     GHR.resize(HISTORY_LEN);
@@ -184,6 +212,7 @@ void perceptron_init()
         }
     }
 }
+
 
 /* ===================================================================== */
 /* Helper Functions                                                      */
