@@ -361,58 +361,6 @@ bool tage_predict(ADDRINT inst_ptr)
             }
         }
     }
-
-    // Extension: Mitigating Long-History Overfitting
-    // If the provider gives a weak prediction (counter 1 or 2) and the altpred
-    // gives a strong prediction (counter 0 or 3), probabilistically favor the
-    // alternative.  Switch probability = alt_history / provider_history, so
-    // a much-shorter alternative must be very confident to override.
-    if (found_provider && g_provider >= 0 && g_altpred != g_prediction)
-    {
-        int provider_n_hist   = tagged_tables[g_provider].n_hist;
-        int provider_idx      = hash_index(pc, hist & hist_mask(provider_n_hist), provider_n_hist);
-        int provider_pred_val = tagged_tables[g_provider].entries[provider_idx].pred;
-        bool provider_weak    = (provider_pred_val == 1 || provider_pred_val == 2);
-
-        // Find the altpred table index so we can check its counter strength
-        int alt_table = -1;
-        for (int i = g_provider - 1; i >= 0; --i)
-        {
-            int n_hist = tagged_tables[i].n_hist;
-            int idx    = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-            int tag    = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
-            if (tagged_tables[i].entries[idx].tag == tag)
-            {
-                alt_table = i;
-                break;
-            }
-        }
-
-        // NEW: only override if provider is unproven (u == 0)
-        bool provider_unproven = (tagged_tables[g_provider].entries[provider_idx].u == 0);
-
-        if (provider_weak && provider_unproven && alt_table >= 0)
-        {
-            //int alt_n_hist   = tagged_tables[alt_table].n_hist;
-            //int alt_idx      = hash_index(pc, hist & hist_mask(alt_n_hist), alt_n_hist);
-            //int alt_pred_val = tagged_tables[alt_table].entries[alt_idx].pred;
-            //bool alt_strong  = (alt_pred_val == 0 || alt_pred_val == 3);
-
-            //if (alt_strong)
-            //{
-                // Switch probability = alt_history_length / provider_history_length
-                // Specifically, use integer comparison: switch if rand() % provider < alt
-                int provider_len = tagged_tables[g_provider].n_hist;
-                int alt_len      = tagged_tables[alt_table].n_hist;
-                if (provider_len > 0 && (rand() % provider_len) < alt_len)
-                {
-                 g_provider   = alt_table;
-                 g_prediction = g_altpred;
-                }
-            //}
-        }
-    }
-
     return g_prediction;
 }
 
