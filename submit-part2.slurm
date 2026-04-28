@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --output=run-part2-%x_%A_%a.out
 #SBATCH --error=run-part2-%x_%A_%a.err
-#SBATCH --array=0   # 1 pintool x 1 benchmark = 1 combo (1)
+#SBATCH --array=0   # 1 pintool x 1 benchmark = 1 combo (0)
 
 cd "$SLURM_SUBMIT_DIR" || exit 1
 export PIN_ROOT=/shared/courseSharedFolders/162593outer/162593/spack/opt/spack/linux-cascadelake/intel-pin-3.31-icrnczcau2lf67etmw5jlzavqlz2hdug
@@ -16,16 +16,19 @@ export PIN_ROOT=/shared/courseSharedFolders/162593outer/162593/spack/opt/spack/l
 # TODO: change this to your specific .so file!
 # to do that, (1) add your custom .cpp file to the makefile.rules, and then (2) execute 'make' from the predictors directory to compile 
 PINTOOLS=(
-    predictors/obj-intel64/part2-tage-custom-confidence-predictor.so
+    predictors/obj-intel64/part2-tage-custom-histoverfit-predictor.so
+    #predictors/obj-intel64/part2-tage-custom-histoverfit-predictor-noalt.so
 )
 # TODO: change this to reflect your custom file name!
 PINTOOL_NAMES=(
-    "tage-custom-confidence"
+    "tage-custom-histoverfit"
+    #"tage-custom-histoverfit-noalt"
 ) 
 # NOTE: DO NOT CHANGE!
 # If you are testing more than 1 pintool at a time, make copies of this string
 PINTOOL_ARGS=(
     "-L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # {0, 2, 4, 8, 16, 32, 64, 128}
+    #"-L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # {0, 2, 4, 8, 16, 32, 64, 128}
 )
 # TODO: uncomment which benchmark you wish to test!
 # start with libquantum, move to dealII if libquantum finishes stronger
@@ -50,7 +53,7 @@ case "$BENCHMARK" in
 esac
 
 # Create output file name
-OUTPUT_FILE="saved-results/part2/${PINTOOL_NAME}_DEFAULTARGS_${BENCHMARK_NAME}.out"
+OUTPUT_FILE="saved-results/part2/${PINTOOL_NAME}_DEFAULTARGS_V4_${BENCHMARK_NAME}.out"
 
 # Run the results
 echo "=== Job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ==="

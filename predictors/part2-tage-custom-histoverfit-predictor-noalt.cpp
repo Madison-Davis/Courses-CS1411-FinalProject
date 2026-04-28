@@ -393,13 +393,13 @@ bool tage_predict(ADDRINT inst_ptr)
 
         if (provider_weak && provider_unproven && alt_table >= 0)
         {
-            int alt_n_hist   = tagged_tables[alt_table].n_hist;
-            int alt_idx      = hash_index(pc, hist & hist_mask(alt_n_hist), alt_n_hist);
-            int alt_pred_val = tagged_tables[alt_table].entries[alt_idx].pred;
-            bool alt_strong  = (alt_pred_val == 0 || alt_pred_val == 3);
+            //int alt_n_hist   = tagged_tables[alt_table].n_hist;
+            //int alt_idx      = hash_index(pc, hist & hist_mask(alt_n_hist), alt_n_hist);
+            //int alt_pred_val = tagged_tables[alt_table].entries[alt_idx].pred;
+            //bool alt_strong  = (alt_pred_val == 0 || alt_pred_val == 3);
 
-            if (alt_strong)
-            {
+            //if (alt_strong)
+            //{
                 // Switch probability = alt_history_length / provider_history_length
                 // Specifically, use integer comparison: switch if rand() % provider < alt
                 int provider_len = tagged_tables[g_provider].n_hist;
@@ -409,7 +409,7 @@ bool tage_predict(ADDRINT inst_ptr)
                  g_provider   = alt_table;
                  g_prediction = g_altpred;
                 }
-            }
+            //}
         }
     }
 
