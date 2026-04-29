@@ -16,16 +16,16 @@ export PIN_ROOT=/shared/courseSharedFolders/162593outer/162593/spack/opt/spack/l
 # TODO: change this to your specific .so file!
 # to do that, (1) add your custom .cpp file to the makefile.rules, and then (2) execute 'make' from the predictors directory to compile 
 PINTOOLS=(
-    predictors/obj-intel64/part2-tage-predictor.so
+    predictors/obj-intel64/part2-perceptron-predictor.so
 )
 # TODO: change this to reflect your custom file name!
 PINTOOL_NAMES=(
-    "tage"
+    "perceptron-predictor"
 ) 
-# NOTE: DO NOT CHANGE TAGE'S ARGUMENTS!
+# NOTE: DO NOT CHANGE FOR PERCEPTRON!
 # If you are testing more than 1 pintool at a time, make copies of this string
 PINTOOL_ARGS=(
-    #"-L1 2 -R 2 -ntables 8 -nentries 4096 -pcbits 12 -tagbits 10 -prob 3" # for TAGE: {0, 2, 4, 8, 16, 32, 64, 128}
+    ""
 )
 # TODO: uncomment which benchmark you wish to test!
 # start with libquantum, move to dealII if libquantum finishes stronger
@@ -50,7 +50,7 @@ case "$BENCHMARK" in
 esac
 
 # Create output file name
-OUTPUT_FILE="saved-results/part2/${PINTOOL_NAME}_DEFAULTARGS_${BENCHMARK_NAME}.out"
+OUTPUT_FILE="saved-results/part3/${PINTOOL_NAME}_DEFAULTARGS_${BENCHMARK_NAME}.out"
 
 # Run the results
 echo "=== Job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ==="

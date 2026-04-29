@@ -81,7 +81,7 @@ end if
 const int HISTORY_LEN       = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
 const int NUM_PERCEPTRONS   = 256;                              // size of perceptron table
 const int THETA_INIT        = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
-const int THETA_MAX         = 255;
+const int THETA_MAX         = 2 * THETA_INIT;
 const int THETA_MIN         = 1;
 const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
