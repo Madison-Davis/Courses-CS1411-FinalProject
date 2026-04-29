@@ -64,6 +64,15 @@ if sign(y_out) != t or |y_out| <= theta then
     end for
 end if
 
+
+[Assumptions]
+- The paper does not state what to initialize the weights to, we start at 0 (the midpoint between our min and mix values)
+- The paper does not mention what to initialize the GHR to, but a nice conservative standard is to set all bits to "not taken," i.e -1
+- The paper does not specify what is meant by hashing the index.  A naive approach would be to do PC % NUM_PERCEPTRONS, but
+  if branches are aligned by certain byte boundaries, then this could cause aliasing.  To give more robustness, we do
+  a folding mechanism ((pc ^ (pc >> 8)) % NUM_PERCEPTRONS so that two instructions with the same bottom bits but different top
+  bits will hash to different indices. 
+
 */
 
 /* ===================================================================== */
@@ -121,8 +130,8 @@ int saturate(int value)
 */
 int perceptron_output(ADDRINT pc)
 {
-    // Modulo indexing into perceptron table
-    int index = pc % NUM_PERCEPTRONS; 
+    // Modulo (with added entropy) indexing into perceptron table
+    int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
     std::vector<int>& weights = perceptron_table[index];
     // Start with bias weight
     int y = weights[0]; 
@@ -155,7 +164,7 @@ bool perceptron_prediction(ADDRINT pc)
 */
 void perceptron_update(ADDRINT pc, bool taken)
 {
-    int index = pc % NUM_PERCEPTRONS;
+    int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
     std::vector<int>& weights = perceptron_table[index];
     int t = taken ? 1 : -1;        // Actual branch outcome as +1/-1
     int y = perceptron_output(pc); // Recompute perceptron output
@@ -168,8 +177,7 @@ void perceptron_update(ADDRINT pc, bool taken)
         // Update history correlation weights
         for(int i = 0; i < HISTORY_LEN; i++)
         {
-            weights[i + 1] =
-                saturate(weights[i + 1] + (t * GHR[i]));
+            weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i]));
         }
     }
 
