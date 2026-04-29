@@ -1,0 +1,12 @@
+=== Job 101402_1 ===
+    Pintool:   perceptron-predictor  (predictors/obj-intel64/part2-perceptron-predictor.so)
+    Args:      <none>
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part2/perceptron-predictor_DEFAULTARGS_V4_quantum.out
+    Started:   Wed Apr 29 01:17:07 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Wed Apr 29 01:32:28 UTC 2026 ===
