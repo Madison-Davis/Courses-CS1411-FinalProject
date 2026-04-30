@@ -136,7 +136,7 @@ int perceptron_output(ADDRINT pc)
     // Start with bias weight
     int y = weights[0]; 
     // Add all correlation terms
-    for(int i = 0; i < HISTORY_LEN; i++)
+    for(int i = 0; i < HISTORY_LEN; ++i)
     {
         y += weights[i + 1] * GHR[i];
     }
@@ -175,14 +175,14 @@ void perceptron_update(ADDRINT pc, bool taken)
         weights[0] = saturate(weights[0] + t); // Update bias weight (note x0 is always 1)
 
         // Update history correlation weights
-        for(int i = 0; i < HISTORY_LEN; i++)
+        for(int i = 0; i < HISTORY_LEN; ++i)
         {
             weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i]));
         }
     }
 
     // Update GHR: shift right and insert new outcome at front
-    for(int i = HISTORY_LEN - 1; i > 0; i--)
+    for(int i = HISTORY_LEN - 1; i > 0; --i)
     {
         GHR[i] = GHR[i - 1];
     }
