@@ -1,0 +1,12 @@
+=== Job 101629_1 ===
+    Pintool:   perceptron-custom-dynamictheta-predictor  (predictors/obj-intel64/part3-perceptron-dynamic-theta.so)
+    Args:      <none>
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part3/perceptron-custom-dynamictheta-predictor_DEFAULTARGSV1_quantum.out
+    Started:   Wed Apr 29 21:58:14 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Wed Apr 29 22:12:18 UTC 2026 ===
