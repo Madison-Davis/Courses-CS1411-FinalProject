@@ -22,8 +22,7 @@ KNOB<BOOL>   KnobPid(KNOB_MODE_WRITEONCE, "pintool",
                             "i", "0", "append pid to output");
 KNOB<UINT64> KnobBranchLimit(KNOB_MODE_WRITEONCE, "pintool",
                             "l", "0", "set limit of branches analyzed");
-KNOB<UINT32> KnobNumPerceptrons(KNOB_MODE_WRITEONCE, "pintool",
-                            "n", "256", "number of perceptrons in table");
+
 
 /* ===================================================================== */
 /* Global Variables */
@@ -84,7 +83,7 @@ const int NUM_PERCEPTRONS   = 256;                              // size of perce
 const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
 const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
-
+const int MULT_CAP          = 3;                                // max amount an update should move the weight
 
 /* ===================================================================== */
 /* Table Structures                                                      */
@@ -104,7 +103,10 @@ std::vector<int> GHR(HISTORY_LEN, -1);
         weights[1...HISTORY_LEN] = history correlation weights
    - Initialized to all 0s
 */
-std::vector<std::vector<int>> perceptron_table;
+std::vector<std::vector<int>> perceptron_table(
+    NUM_PERCEPTRONS,
+    std::vector<int>(HISTORY_LEN + 1, 0)
+);
 
 
 /* ===================================================================== */
@@ -129,8 +131,7 @@ int saturate(int value)
 int perceptron_output(ADDRINT pc)
 {
     // Modulo (with added entropy) indexing into perceptron table
-    int num_perc = (int)KnobNumPerceptrons.Value();
-    int index = (int)((pc ^ (pc >> 8)) % num_perc);
+    int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
     std::vector<int>& weights = perceptron_table[index];
     // Start with bias weight
     int y = weights[0]; 
@@ -163,8 +164,7 @@ bool perceptron_prediction(ADDRINT pc)
 */
 void perceptron_update(ADDRINT pc, bool taken)
 {
-    int num_perc = (int)KnobNumPerceptrons.Value();
-    int index = (int)((pc ^ (pc >> 8)) % num_perc);
+    int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
     std::vector<int>& weights = perceptron_table[index];
     int t = taken ? 1 : -1;        // Actual branch outcome as +1/-1
     int y = perceptron_output(pc); // Recompute perceptron output
@@ -177,7 +177,7 @@ void perceptron_update(ADDRINT pc, bool taken)
         // Update history correlation weights
         for(int i = 0; i < HISTORY_LEN; ++i)
         {
-            weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i]));
+            weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i] * std::min(abs(y), MULT_CAP)));
         }
     }
 
@@ -201,8 +201,6 @@ void perceptron_update(ADDRINT pc, bool taken)
 */
 void perceptron_init()
 {
-    int num_perc = (int)KnobNumPerceptrons.Value();
-
     GHR.resize(HISTORY_LEN);
 
     for(int i = 0; i < HISTORY_LEN; i++)
@@ -210,9 +208,9 @@ void perceptron_init()
         GHR[i] = -1;
     }
 
-    perceptron_table.resize(num_perc);
+    perceptron_table.resize(NUM_PERCEPTRONS);
 
-    for(int i = 0; i < num_perc; i++)
+    for(int i = 0; i < NUM_PERCEPTRONS; i++)
     {
         perceptron_table[i].resize(HISTORY_LEN + 1);
 
