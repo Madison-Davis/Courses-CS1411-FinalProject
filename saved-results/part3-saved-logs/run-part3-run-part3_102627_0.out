@@ -2,7 +2,7 @@
     Pintool:   perceptron-tage  (predictors/obj-intel64/part3-perceptron-tage.so)
     Args:      <none>
     Benchmark: dealII  (./benchmarks/dealII_O3 10)
-    Output:    saved-results/part3/perceptron-tage_DEFAULTARGSV2_dealII.out
+    Output:    saved-results/part3/perceptron-custom-tage-predictor_DEFAULTARGS_dealII.out
     Started:   Fri May  1 17:38:57 UTC 2026
 Refinement cycle: 0
    Number of degrees of freedom=79

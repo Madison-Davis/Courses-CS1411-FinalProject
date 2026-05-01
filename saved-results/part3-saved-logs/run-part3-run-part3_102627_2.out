@@ -2,7 +2,7 @@
     Pintool:   perceptron-training-freezing  (predictors/obj-intel64/part3-perceptron-training-freezing.so)
     Args:      <none>
     Benchmark: dealII  (./benchmarks/dealII_O3 10)
-    Output:    saved-results/part3/perceptron-training-freezing_DEFAULTARGS_dealII.out
+    Output:    saved-results/part3/perceptron-custom-trainingfreezing-predictor_DEFAULTARGS_dealII.out
     Started:   Fri May  1 17:38:56 UTC 2026
 Refinement cycle: 0
    Number of degrees of freedom=79

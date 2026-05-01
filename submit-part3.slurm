@@ -53,7 +53,7 @@ case "$BENCHMARK" in
 esac
 
 # Create output file name
-OUTPUT_FILE="saved-results/part3/${PINTOOL_NAME}_DEFAULTARGSV2_${BENCHMARK_NAME}.out"
+OUTPUT_FILE="saved-results/part3/${PINTOOL_NAME}_DEFAULTARGS_${BENCHMARK_NAME}.out"
 
 # Run the results
 echo "=== Job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} ==="
