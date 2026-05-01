@@ -84,7 +84,7 @@ const int NUM_PERCEPTRONS   = 256;                              // size of perce
 const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
 const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
-
+const int FREEZE_THRESH     = 10;                               // at what point do we freeze training
 
 /* ===================================================================== */
 /* Table Structures                                                      */
@@ -106,6 +106,11 @@ std::vector<int> GHR(HISTORY_LEN, -1);
 */
 std::vector<std::vector<int>> perceptron_table;
 
+/* 3. EXTENSION: freeze tables
+    - keep track of which perceptrons to not train on
+*/
+std::vector<int>  freeze_counter;
+std::vector<bool> frozen;
 
 /* ===================================================================== */
 /* Perceptron Functions                                                  */
@@ -170,16 +175,42 @@ void perceptron_update(ADDRINT pc, bool taken)
     int y = perceptron_output(pc); // Recompute perceptron output
     bool prediction = (y >= 0);    // Current prediction based on output
 
+    // EXTENSION: check the currently frozen ones and see if we can unfreeze them
+    if (frozen[index])
+    {
+        // if frozen and incorrect, degrade trust but not all way to 0
+        if (prediction != taken)
+        {
+            frozen[index] = false;
+            freeze_counter[index] = freeze_counter[index] / 2;
+        }
+        // if frozen and correct, skip weight update entirely
+        else
+        {
+            for (int i = HISTORY_LEN - 1; i > 0; i--) GHR[i] = GHR[i - 1];
+            GHR[0] = t;
+            return;
+        }
+    }
+
     if((prediction != taken) || (abs(y) <= THETA))
     {
-        weights[0] = saturate(weights[0] + t); // Update bias weight (note x0 is always 1)
-
+        // Update bias weight (note x0 is always 1)
+        weights[0] = saturate(weights[0] + t); 
         // Update history correlation weights
         for(int i = 0; i < HISTORY_LEN; i++)
         {
             weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i]));
         }
+        // Output was wrong, but let's not overpunish it, just dip it
+        freeze_counter[index] = freeze_counter[index] / 2;
+    } else
+    {
+        // if its correct and we've gotten enough confidence at this point, freeze it
+        if (++freeze_counter[index] >= FREEZE_THRESH)
+            frozen[index] = true;
     }
+
 
     // Update GHR: shift right and insert new outcome at front
     for(int i = HISTORY_LEN - 1; i > 0; i--)
@@ -221,6 +252,10 @@ void perceptron_init()
             perceptron_table[i][j] = 0;
         }
     }
+
+    // EXTENSION: add the freeze counter
+    freeze_counter.assign(num_perc, 0);
+    frozen.assign(num_perc, false);
 }
 
 

@@ -1,0 +1,12 @@
+=== Job 102551_6 ===
+    Pintool:         perceptron-sweep-numperc  (predictors/obj-intel64/part3-perceptron-predictor.so)
+    NUM_PERCEPTRONS: 128
+    Benchmark:       quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:          saved-results/part3/perceptron_sweep_numperc_128_quantum.out
+    Started:         Fri May  1 13:58:53 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Fri May  1 14:29:43 UTC 2026 ===
