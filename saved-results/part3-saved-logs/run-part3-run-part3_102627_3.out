@@ -1,0 +1,12 @@
+=== Job 102627_3 ===
+    Pintool:   perceptron-training-freezing  (predictors/obj-intel64/part3-perceptron-training-freezing.so)
+    Args:      <none>
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part3/perceptron-training-freezing_DEFAULTARGS_quantum.out
+    Started:   Fri May  1 17:38:57 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Fri May  1 18:12:37 UTC 2026 ===
