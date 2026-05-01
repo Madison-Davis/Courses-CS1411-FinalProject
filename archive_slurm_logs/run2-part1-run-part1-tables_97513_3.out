@@ -1,0 +1,7 @@
+=== Job 97513_3 ===
+    Pintool:   tage (predictors/obj-intel64/part1-tage-predictor.so)
+    Args:      -s 1024
+    Tables:    16
+    Benchmark: quantum (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part1_table/tage_t16_quantum.out
+    Started:   Thu Apr 23 15:34:41 UTC 2026

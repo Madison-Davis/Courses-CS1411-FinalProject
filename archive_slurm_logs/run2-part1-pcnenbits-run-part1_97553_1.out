@@ -1,0 +1,12 @@
+=== Job 97553_1 ===
+    PC BITS:   4
+    NENTRIES:  16
+    Benchmark: quantum
+    Output:    saved-results/part1_table/tage_pc4_n16_quantum.out
+    Started:   Thu Apr 23 16:28:47 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Thu Apr 23 17:21:11 UTC 2026 ===

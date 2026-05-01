@@ -1,0 +1,10 @@
+Experiment           Miss Rate (%)
+----------------------------------
+tage_t8_quantum            0.0559%
+tage_t12_quantum           0.0597%
+tage_t6_quantum            0.0914%
+tage_t4_quantum            0.6242%
+tage_t8_dealII             1.3067%
+tage_t12_dealII            1.4083%
+tage_t6_dealII             1.4956%
+tage_t4_dealII             3.0258%

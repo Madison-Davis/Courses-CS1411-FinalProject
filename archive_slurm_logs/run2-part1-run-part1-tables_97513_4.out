@@ -1,0 +1,8 @@
+=== Job 97513_4 ===
+    Pintool:   tage (predictors/obj-intel64/part1-tage-predictor.so)
+    Args:      -s 1024
+    Tables:    32
+    Benchmark: dealII (./benchmarks/dealII_O3 10)
+    Output:    saved-results/part1_table/tage_t32_dealII.out
+    Started:   Thu Apr 23 15:34:42 UTC 2026
+Refinement cycle: 0

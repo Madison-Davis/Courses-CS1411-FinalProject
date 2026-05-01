@@ -1,0 +1,14 @@
+Experiment                   Miss Rate (%)
+------------------------------------------
+tage_pc12_n4096_quantum            0.0907%
+tage_pc10_n1024_quantum            0.0914%
+tage_pc16_n65536_quantum           0.1304%
+tage_pc14_n16384_quantum           0.1706%
+tage_pc8_n256_quantum              0.1769%
+tage_pc4_n16_quantum               0.3042%
+tage_pc16_n65536_dealII            1.3232%
+tage_pc14_n16384_dealII            1.3533%
+tage_pc12_n4096_dealII             1.4091%
+tage_pc10_n1024_dealII             1.4955%
+tage_pc8_n256_dealII               1.6810%
+tage_pc4_n16_dealII                4.4194%

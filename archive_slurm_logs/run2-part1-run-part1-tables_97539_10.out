@@ -1,0 +1,19 @@
+=== Job 97539_10 ===
+    PC BITS:   16
+    NENTRIES:  65536
+    Benchmark: dealII
+    Output:    saved-results/part1_table/tage_pc16_n65536_dealII.out
+    Started:   Thu Apr 23 16:24:06 UTC 2026
+Refinement cycle: 0
+   Number of degrees of freedom=79
+   Point value=0.111419
+   Estimated error=-0.0202358
+Refinement cycle: 1
+   Number of degrees of freedom=303
+   Point value=0.110124
+   Estimated error=-0.00791284
+Refinement cycle: 2
+   Number of degrees of freedom=457
+   Point value=0.1092
+   Estimated error=-0.00475766
+Refinement cycle: 3

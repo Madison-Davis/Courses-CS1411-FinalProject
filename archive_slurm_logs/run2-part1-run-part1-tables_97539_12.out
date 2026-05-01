@@ -1,0 +1,8 @@
+=== Job 97539_12 ===
+    PC BITS:   
+    NENTRIES:  1
+    Benchmark: dealII
+    Output:    saved-results/part1_table/tage_pc_n1_dealII.out
+    Started:   Thu Apr 23 16:24:05 UTC 2026
+NFE: [tid:105376] invalid option "1"
+=== Done: Thu Apr 23 16:24:05 UTC 2026 ===
