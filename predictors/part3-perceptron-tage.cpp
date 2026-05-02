@@ -96,10 +96,9 @@ UINT64 CountCorrect = 0;
 /* ===================================================================== */
 /* Runtime-Configurable TAGE Parameters                                  */
 /* ===================================================================== */
-static const int NHIST      = 128;
-static UINT32 L1            = 4;
+static UINT32 L1            = 2;
 static UINT32 R             = 2;
-static UINT32 NTABLES       = 6;
+static UINT32 NTABLES       = 8;
 static UINT32 NENTRIES      = 4096;
 static UINT32 PC_BITS       = 12;
 static UINT32 TAG_BITS      = 10;
@@ -107,11 +106,10 @@ static UINT32 PROB          = 3;
 
 
 /* ===================================================================== */
-/* Runtime-Configurable Perceptron Parameters                            */
+/* EXTENSION: Runtime-Configurable Perceptron Parameters                 */
 /* ===================================================================== */
-const int HISTORY_LEN       = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
-// const int THETA             = (int)(1.93 * HISTORY_LEN + 14); // training threshold from paper (empirically derived, floor [1.93h + 14]
-// EXTENSION: commented out so that we can make a THETA per table
+const int HISTORY_LEN       = 128;                              // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
+const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
 const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 
@@ -121,7 +119,7 @@ const int WEIGHT_MIN        = -127;                             // 2^7; saturati
 /* ===================================================================== */
 struct base_table_entry
 {
-    std::vector<int> weights; // EXTENSION: weights of a single perceptron
+    std::vector<int> weights; // EXTENSION: size HISTORY_LEN + 1
 };
 
 struct base_table
@@ -132,8 +130,8 @@ struct base_table
 struct tagged_table_entry
 {
     int tag;
-    std::vector<int> weights;   // EXTENSION: weights of the perceptron
-    int u;                      // 2-bit satured counter: [0..3]
+    std::vector<int> weights; // EXTENSION: size HISTORY_LEN + 1
+    int u;    // 2-bit satured counter: [0..3]
 };
 
 struct tagged_table
@@ -144,37 +142,66 @@ struct tagged_table
 
 base_table t0;                           // base table, 1 of these
 std::vector<tagged_table> tagged_tables; // tagged tables, NTABLES - 1 of these
-__uint128_t hist = 0;                    // global history, of size NHIST
 static int g_provider = -1;              // index for table providing the prediction: -1 = base, 0..NTABLES-2 = tagged table index
 static bool g_prediction = false;        // prediction given by the table we chose
 static bool g_altpred = false;           // prediction given by the next-lowest matching table, if applicable
 
-// EXTENSION: GHR and perceptron table!
-std::vector<int> GHR(HISTORY_LEN, -1);
+// EXTENSION: GHR, same as perceptron predictor, +/- 1 encoding
+std::vector<int> perc_GHR(HISTORY_LEN, -1); // global history, of size HISTORY_LEN
 
 /* ===================================================================== */
 /* Helper Functions                                                      */
 /* ===================================================================== */
-static inline __uint128_t hist_mask(int n_hist)
-// Compute a history mask based on n_hist, capping at 128-bits
+// EXTENSION
+int saturate(int value)
+// Helper function to keep weights within bounds
 {
-    if (n_hist == 0)
-        return (__uint128_t)0;
-    if (n_hist >= 128)
-        return ~(__uint128_t)0;
-    return ((__uint128_t)1 << n_hist) - 1;
+    if(value > WEIGHT_MAX) return WEIGHT_MAX;
+    if(value < WEIGHT_MIN) return WEIGHT_MIN;
+    return value;
 }
 
-static int compress_history(__uint128_t h, int n_hist, int out_bits)
+// EXTENSION
+int perc_dot(const std::vector<int>& weights) 
+// Perform dot product for perceptron
+{
+    int y = weights[0]; // bias
+    for (int i = 0; i < HISTORY_LEN; i++)
+        y += weights[i + 1] * perc_GHR[i];
+    return y;
+}
+
+// EXTENSION
+void perc_train(std::vector<int>& weights, bool taken) 
+// Perform training for perceptron
+{    
+    int t = taken ? 1 : -1;
+    int y = perc_dot(weights);
+    bool pred = (y >= 0);
+    if (pred != taken || std::abs(y) <= THETA) {
+        weights[0] = saturate(weights[0] + t);
+        for (int i = 0; i < HISTORY_LEN; i++)
+            weights[i + 1] = saturate(weights[i + 1] + t * perc_GHR[i]);
+    }
+}
+
+static int compress_history(int n_hist, int out_bits)
 // Used to fold successive history bits into out_bits width
 // Helpful for hash_index and hash_tag
 // Ex: for n_hist of width out_bits, we do result = h[0:7] XOR h[8:15] XOR h[16:19]
 {
     int result = 0;
-    int effective = std::min(n_hist, NHIST);
+    int effective = std::min(n_hist, HISTORY_LEN);
     for (int shift = 0; shift < effective; shift += out_bits)
     {
-        result ^= (int)((h >> shift) & ((1 << out_bits) - 1));
+        // EXTENSION: written just for a vector vs bit-type
+        int chunk = 0;
+        for (int b = 0; b < out_bits && (shift + b) < effective; b++)
+        {
+            int bit = (perc_GHR[shift + b] == 1) ? 1 : 0; // convert +/-1 to 0/1
+            chunk |= (bit << b);
+        }
+        result ^= chunk;
     }
     return result;
 }
@@ -183,56 +210,30 @@ static int compress_history(__uint128_t h, int n_hist, int out_bits)
 static inline int sat_inc(int v, int max) { return (v < max) ? v + 1 : max; }
 static inline int sat_dec(int v) { return (v > 0) ? v - 1 : 0; }
 
-static int hash_index(int pc, __uint128_t h, int n_hist)
+static int hash_index(int pc, int n_hist)
 // Paper Section 2.4: Hash = PC + folded-history
 // XOR successive PC_BITS-wide chunks of history into low PC bits
 // Ex: to hash 30-bit hist to 10 bits, index = PC[0:9] XOR h[0:9] XOR h[10:19] XOR h[20:29]
 {
     int pc_bits = pc & ((1 << PC_BITS) - 1);        // Ex: PC[0:9]
-    int csr = compress_history(h, n_hist, PC_BITS); // Ex: h[0:9] XOR h[10:19] XOR h[20:29]
+    int csr = compress_history(n_hist, PC_BITS); // Ex: h[0:9] XOR h[10:19] XOR h[20:29]
     return (pc_bits ^ csr) & ((1 << PC_BITS) - 1);
 }
 
-static int hash_tag(int pc, __uint128_t h, int n_hist)
+static int hash_tag(int pc, int n_hist)
 // Paper Section 2.4: Hash = PC + circular shift register (CSRs)
 // Ex: suppose our hash is 8 bits.  Each tagged table uses CSR1 and CSR2 of width 8 and 8-1=7 bits.
 // index = PC[0:9] XOR CSR1 XOR (CSR2 << 1)
 {
     int pc_bits = pc & ((1 << TAG_BITS) - 1);
-    int csr1 = compress_history(h, n_hist, TAG_BITS);
-    int csr2 = compress_history(h, n_hist, TAG_BITS - 1);
+    int csr1 = compress_history(n_hist, TAG_BITS);
+    int csr2 = compress_history(n_hist, TAG_BITS - 1);
     return (pc_bits ^ csr1 ^ (csr2 << 1)) & ((1 << TAG_BITS) - 1);
-}
-
-int tagged_output(tagged_table_entry &e, int n_hist)
-// EXTENSION: help compute the dot product for a tagged entry
-{
-    int y = e.weights[0];
-    int len = std::min(n_hist, HISTORY_LEN);
-    for (int i = 0; i < len; ++i)
-        y += e.weights[i + 1] * GHR[i];
-    return y;
-}
-
-int base_output(base_table_entry &e)
-// EXTENSION: help compute the dot product for the base tagged entry
-{
-    int y = e.weights[0];
-    for (int i = 0; i < HISTORY_LEN; ++i)
-        y += e.weights[i + 1] * GHR[i];
-    return y;
-}
-
-static int compute_theta(int n_hist)
-// EXTENSION: per-table theta
-{
-    return (int)(1.93 * n_hist + 14);
 }
 
 /* ===================================================================== */
 /* Main Functions                                                        */
 /* ===================================================================== */
-
 void tage_init()
 // Initialize TAGE
 {
@@ -245,10 +246,10 @@ void tage_init()
     PROB     = KnobProb.Value();
 
     // Base predictor table
-    // EXTENSION: only 1 row/perceptron
-    t0.entries.resize(1);
-    t0.entries[0].weights.assign(HISTORY_LEN + 1, 0);
-
+    t0.entries.resize(NENTRIES);
+    for (int k = 0; k < (int)NENTRIES; ++k)
+        t0.entries[k].weights.assign(HISTORY_LEN + 1, 0); // EXTENSION: init weights
+    
     // Tagged predictor tables
     for (int i = 0; i < (int)NTABLES - 1; ++i)
     {
@@ -265,7 +266,7 @@ void tage_init()
                 tagged_tables[i].entries.resize(NENTRIES);
             }
             tagged_tables[i].entries[k].tag = -1; // init tags to impossible bit
-            tagged_tables[i].entries[k].weights.assign(tagged_tables[i].n_hist + 1, 0); // EXTENSION: assign weights
+            tagged_tables[i].entries[k].weights.assign(HISTORY_LEN + 1, 0); // EXTENSION: init weights
             tagged_tables[i].entries[k].u = 0;
         }
     }
@@ -280,37 +281,20 @@ void tage_update(ADDRINT inst_ptr, bool taken)
     if (g_provider == -1)
     {
         // Base table predictor
-        // EXTENSION: Update the base prediction directly
-        base_table_entry &b = t0.entries[0];
-        int t = taken ? 1 : -1;
-        int y = base_output(b);
-        bool prediction = (y >= 0);
-        if ((prediction != taken) || (abs(y) <= compute_theta(HISTORY_LEN)))
-        {
-            b.weights[0] = saturate(b.weights[0] + t);
-            for (int i = 0; i < HISTORY_LEN; ++i)
-                b.weights[i + 1] = saturate(b.weights[i + 1] + (t * GHR[i]));
-        }
+        // Update the prediction counter based on if right or wrong
+        // EXTENSION: update via training
+        int idx = pc & (NENTRIES - 1);
+        perc_train(t0.entries[idx].weights, taken);
     }
     else
     {
         // Tagged table predictor
         // Update the prediction counter based on if right or wrong, capping at [0...3]
+        // EXTENSION: update via training
         int n_hist = tagged_tables[g_provider].n_hist;
-        int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-        tagged_table_entry &e = tagged_tables[g_provider].entries[idx];
-        
-        // EXTENSION: instead of updating a saturated counter, update the weights
-        int t = taken ? 1 : -1;
-        int y = tagged_output(e, n_hist);
-        bool prediction = (y >= 0);
-        if ((prediction != taken) || (abs(y) <= compute_theta(n_hist)))
-        {
-            e.weights[0] = saturate(e.weights[0] + t);
-            int len = std::min(n_hist, HISTORY_LEN);
-            for (int i = 0; i < len; ++i)
-                e.weights[i + 1] = saturate(e.weights[i + 1] + (t * GHR[i]));
-        }
+        int idx = hash_index(pc, n_hist);
+        tagged_table_entry& e = tagged_tables[g_provider].entries[idx];
+        perc_train(tagged_tables[g_provider].entries[idx].weights, taken);
 
         // Update useful counter u
         // Increment when provider correct AND alt wrong
@@ -337,12 +321,12 @@ void tage_update(ADDRINT inst_ptr, bool taken)
         int start = (g_provider == -1) ? 0 : g_provider + 1;
 
         // Collect potential candidates for eviction across matching tagged table indices, where u == 0
-        int candidates[NTABLES];
+        std::vector<int> candidates(NTABLES);
         int n_candidates = 0;
         for (int j = start; j < (int)NTABLES - 1; ++j)
         {
             int n_hist = tagged_tables[j].n_hist;
-            int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+            int idx = hash_index(pc, n_hist);
             if (tagged_tables[j].entries[idx].u == 0)
                 candidates[n_candidates++] = j;
         }
@@ -359,12 +343,11 @@ void tage_update(ADDRINT inst_ptr, bool taken)
 
             // Find the index to overwrite in the chosen tagged table, then overwrite it
             int n_hist = tagged_tables[chosen].n_hist;
-            int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-            int tag = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
+            int idx = hash_index(pc, n_hist);
+            int tag = hash_tag(pc, n_hist);
 
             tagged_tables[chosen].entries[idx].tag = tag;
-            // EXTENSION: make new weights
-            tagged_tables[chosen].entries[idx].weights.assign(tagged_tables[chosen].n_hist + 1, 0);
+            tagged_tables[chosen].entries[idx].weights.assign(HISTORY_LEN + 1, 0); // EXTENSION: init weights for perceptron
             tagged_tables[chosen].entries[idx].u = 0;
         }
         // If we don't have a candidate for eviction (no u = 0)...
@@ -374,16 +357,18 @@ void tage_update(ADDRINT inst_ptr, bool taken)
             for (int j = start; j < (int)NTABLES - 1; ++j)
             {
                 int n_hist = tagged_tables[j].n_hist;
-                int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
+                int idx = hash_index(pc, n_hist);
                 tagged_tables[j].entries[idx].u = sat_dec(tagged_tables[j].entries[idx].u);
             }
         }
     }
 
     // STEP 3: Shift the global history based on recent branch's outcome
-    hist = ((hist << 1) | (taken ? (__uint128_t)1 : 0)) & hist_mask(NHIST);
-    for (int i = HISTORY_LEN - 1; i > 0; --i) GHR[i] = GHR[i - 1];
-    GHR[0] = taken ? 1 : -1;
+    // EXTENSION: using vector now for history, shift perc_GHR
+    int t = taken ? 1 : -1;
+    for (int i = HISTORY_LEN - 1; i > 0; i--)
+        perc_GHR[i] = perc_GHR[i-1];
+    perc_GHR[0] = t;
 }
 
 bool tage_predict(ADDRINT inst_ptr)
@@ -393,8 +378,7 @@ bool tage_predict(ADDRINT inst_ptr)
 
     // Default: base predictor
     g_provider = -1;
-    // EXTENSION: use perceptron output
-    g_prediction = (base_output(t0.entries[0]) >= 0);
+    g_prediction = (perc_dot(t0.entries[pc & (NENTRIES-1)].weights) >= 0); // EXTENSION: look at perceptron
     g_altpred = g_prediction;
     bool found_provider = false;
 
@@ -402,8 +386,8 @@ bool tage_predict(ADDRINT inst_ptr)
     for (int i = NTABLES - 2; i >= 0; --i)
     {
         int n_hist = tagged_tables[i].n_hist;
-        int idx = hash_index(pc, hist & hist_mask(n_hist), n_hist);
-        int tag = hash_tag(pc, hist & hist_mask(n_hist), n_hist);
+        int idx = hash_index(pc, n_hist);
+        int tag = hash_tag(pc, n_hist);
 
         // If we found a match...
         if (tagged_tables[i].entries[idx].tag == tag)
@@ -411,23 +395,20 @@ bool tage_predict(ADDRINT inst_ptr)
             if (!found_provider)
             {
                 // First (longest) hit: this is our provider!
-                // EXTENSION: use the perceptron output
                 g_provider = i;
-                g_prediction = (tagged_output(tagged_tables[i].entries[idx], tagged_tables[i].n_hist) >= 0);
+                g_prediction = (perc_dot(tagged_tables[i].entries[idx].weights) >= 0); // EXTENSION: look at perceptorn
                 found_provider = true;
             }
             else
             {
                 // Second hit: this is our altpred!
-                // EXTENSION: use the perceptron output
-                g_altpred = (tagged_output(tagged_tables[i].entries[idx], tagged_tables[i].n_hist) >= 0);
+                g_altpred = (perc_dot(tagged_tables[i].entries[idx].weights) >= 0); // EXTENSION: look at perceptorn
                 break; // have both provider and alt, all done!
             }
         }
     }
     return g_prediction;
 }
-
 
 /* ===================================================================== */
 /* Helper Functions                                                      */
