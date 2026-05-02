@@ -22,11 +22,7 @@
 # This defines tests which run tools of the same name.  This is simply for convenience to avoid
 # defining the test name twice (once in TOOL_ROOTS and again in TEST_ROOTS).
 # Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
-<<<<<<< HEAD
-TEST_TOOL_ROOTS := part1-tage-predictor
-=======
 TEST_TOOL_ROOTS := part3-perceptron-multilayer
->>>>>>> 76b14e195861dbc720314af719980f720fc0675f
 
 # This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
 TEST_ROOTS :=
