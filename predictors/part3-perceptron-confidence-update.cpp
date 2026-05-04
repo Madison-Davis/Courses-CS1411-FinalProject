@@ -6,23 +6,23 @@
 #include <cstdlib>
 #include "pin.H"
 
-using std::ofstream;
-using std::cout;
 using std::cerr;
+using std::cout;
 using std::endl;
+using std::ofstream;
 using std::string;
-
 
 /* ===================================================================== */
 /* Commandline Switches */
 /* ===================================================================== */
 KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
                             "o", "hw3.out", "specify output file name");
-KNOB<BOOL>   KnobPid(KNOB_MODE_WRITEONCE, "pintool",
-                            "i", "0", "append pid to output");
+KNOB<BOOL> KnobPid(KNOB_MODE_WRITEONCE, "pintool",
+                   "i", "0", "append pid to output");
 KNOB<UINT64> KnobBranchLimit(KNOB_MODE_WRITEONCE, "pintool",
-                            "l", "0", "set limit of branches analyzed");
-
+                             "l", "0", "set limit of branches analyzed");
+KNOB<UINT64> KnobMultCap(KNOB_MODE_WRITEONCE, "pintool",
+                         "mult_cap", "3", "max confidence multiplier cap");
 
 /* ===================================================================== */
 /* Global Variables */
@@ -30,7 +30,6 @@ KNOB<UINT64> KnobBranchLimit(KNOB_MODE_WRITEONCE, "pintool",
 UINT64 CountSeen = 0;
 UINT64 CountTaken = 0;
 UINT64 CountCorrect = 0;
-
 
 /* ===================================================================== */
 /* WRITTEN: Perceptron Branch Predictor                                  */
@@ -71,20 +70,20 @@ end if
 - The paper does not specify what is meant by hashing the index.  A naive approach would be to do PC % NUM_PERCEPTRONS, but
   if branches are aligned by certain byte boundaries, then this could cause aliasing.  To give more robustness, we do
   a folding mechanism ((pc ^ (pc >> 8)) % NUM_PERCEPTRONS so that two instructions with the same bottom bits but different top
-  bits will hash to different indices. 
+  bits will hash to different indices.
 
 */
 
 /* ===================================================================== */
 /* Runtime-Configurable Perceptron Parameters                            */
 /* ===================================================================== */
-const int HISTORY_LEN       = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
-const int NUM_PERCEPTRONS   = 256;                              // size of perceptron table
-const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
-const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
-const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
-const int MULT_CAP          = 3;                                // max amount an update should move the weight
-
+const int HISTORY_LEN = 32;                       // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
+const int NUM_PERCEPTRONS = 256;                  // size of perceptron table
+const int THETA = (int)(1.93 * HISTORY_LEN + 14); // training threshold from paper (empirically derived, floor [1.93h + 14]
+const int WEIGHT_MAX = 127;                       // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
+const int WEIGHT_MIN = -127;                      // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
+// const int MULT_CAP          = 3;                                // max amount an update should move the weight
+static int MULT_CAP = 3;
 /* ===================================================================== */
 /* Table Structures                                                      */
 /* ===================================================================== */
@@ -105,9 +104,7 @@ std::vector<int> GHR(HISTORY_LEN, -1);
 */
 std::vector<std::vector<int>> perceptron_table(
     NUM_PERCEPTRONS,
-    std::vector<int>(HISTORY_LEN + 1, 0)
-);
-
+    std::vector<int>(HISTORY_LEN + 1, 0));
 
 /* ===================================================================== */
 /* Perceptron Functions                                                  */
@@ -117,8 +114,10 @@ std::vector<std::vector<int>> perceptron_table(
 */
 int saturate(int value)
 {
-    if(value > WEIGHT_MAX) return WEIGHT_MAX;
-    if(value < WEIGHT_MIN) return WEIGHT_MIN;
+    if (value > WEIGHT_MAX)
+        return WEIGHT_MAX;
+    if (value < WEIGHT_MIN)
+        return WEIGHT_MIN;
     return value;
 }
 
@@ -132,11 +131,11 @@ int perceptron_output(ADDRINT pc)
 {
     // Modulo (with added entropy) indexing into perceptron table
     int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
-    std::vector<int>& weights = perceptron_table[index];
+    std::vector<int> &weights = perceptron_table[index];
     // Start with bias weight
-    int y = weights[0]; 
+    int y = weights[0];
     // Add all correlation terms
-    for(int i = 0; i < HISTORY_LEN; ++i)
+    for (int i = 0; i < HISTORY_LEN; ++i)
     {
         y += weights[i + 1] * GHR[i];
     }
@@ -145,7 +144,7 @@ int perceptron_output(ADDRINT pc)
 
 /*  perceptron_prediction
     return true/false prediction
-*/  
+*/
 bool perceptron_prediction(ADDRINT pc)
 {
     int y = perceptron_output(pc);
@@ -165,24 +164,24 @@ bool perceptron_prediction(ADDRINT pc)
 void perceptron_update(ADDRINT pc, bool taken)
 {
     int index = (int)((pc ^ (pc >> 8)) % NUM_PERCEPTRONS);
-    std::vector<int>& weights = perceptron_table[index];
+    std::vector<int> &weights = perceptron_table[index];
     int t = taken ? 1 : -1;        // Actual branch outcome as +1/-1
     int y = perceptron_output(pc); // Recompute perceptron output
     bool prediction = (y >= 0);    // Current prediction based on output
 
-    if((prediction != taken) || (abs(y) <= THETA))
+    if ((prediction != taken) || (abs(y) <= THETA))
     {
         weights[0] = saturate(weights[0] + t); // Update bias weight (note x0 is always 1)
 
         // Update history correlation weights
-        for(int i = 0; i < HISTORY_LEN; ++i)
+        for (int i = 0; i < HISTORY_LEN; ++i)
         {
-            weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i] * std::min(abs(y), MULT_CAP)));
+            weights[i + 1] = saturate(weights[i + 1] + (t * GHR[i] * std::max(1, std::min(abs(y), MULT_CAP))));
         }
     }
 
     // Update GHR: shift right and insert new outcome at front
-    for(int i = HISTORY_LEN - 1; i > 0; --i)
+    for (int i = HISTORY_LEN - 1; i > 0; --i)
     {
         GHR[i] = GHR[i - 1];
     }
@@ -201,26 +200,26 @@ void perceptron_update(ADDRINT pc, bool taken)
 */
 void perceptron_init()
 {
+    MULT_CAP = KnobMultCap.Value();
     GHR.resize(HISTORY_LEN);
 
-    for(int i = 0; i < HISTORY_LEN; i++)
+    for (int i = 0; i < HISTORY_LEN; i++)
     {
         GHR[i] = -1;
     }
 
     perceptron_table.resize(NUM_PERCEPTRONS);
 
-    for(int i = 0; i < NUM_PERCEPTRONS; i++)
+    for (int i = 0; i < NUM_PERCEPTRONS; i++)
     {
         perceptron_table[i].resize(HISTORY_LEN + 1);
 
-        for(int j = 0; j <= HISTORY_LEN; j++)
+        for (int j = 0; j <= HISTORY_LEN; j++)
         {
             perceptron_table[i][j] = 0;
         }
     }
 }
-
 
 /* ===================================================================== */
 /* Helper Functions                                                      */
@@ -238,11 +237,12 @@ static INT32 Usage()
 VOID write_results(bool limit_reached)
 {
     string output_file = KnobOutputFile.Value();
-    if(KnobPid) output_file += "." + decstr(getpid());
+    if (KnobPid)
+        output_file += "." + decstr(getpid());
 
     std::ofstream out(output_file.c_str());
 
-    if(limit_reached)
+    if (limit_reached)
         out << "Reason: limit reached\n";
     else
         out << "Reason: fini\n";
@@ -252,26 +252,26 @@ VOID write_results(bool limit_reached)
     out.close();
 }
 
-
 /* ===================================================================== */
 /* Instrumentation Code and Analysis Code                                */
 /* ===================================================================== */
 VOID br_predict(ADDRINT ins_ptr, INT32 taken)
 {
     // Count the number of branches seen
-	CountSeen++;
-	// Count the take branches
-	if (taken){
-			CountTaken++;
-	}
+    CountSeen++;
+    // Count the take branches
+    if (taken)
+    {
+        CountTaken++;
+    }
 
-	// Count the correctly predicted branches
-	if(perceptron_prediction(ins_ptr) == taken)
-		CountCorrect++;
+    // Count the correctly predicted branches
+    if (perceptron_prediction(ins_ptr) == taken)
+        CountCorrect++;
 
-	// Update branch prediction buffer
-	perceptron_update(ins_ptr, taken);
-    if(CountSeen == KnobBranchLimit.Value())
+    // Update branch prediction buffer
+    perceptron_update(ins_ptr, taken);
+    if (CountSeen == KnobBranchLimit.Value())
     {
         write_results(true);
         exit(0);
@@ -284,41 +284,40 @@ VOID Instruction(INS ins, void *v)
     // broken into "call" or "not call".  Call is for a subroutine
     // These are left as subcases in case the programmer wants
     // to extend the statistics to see how sub cases of branches behave
-    if( INS_IsRet(ins) )
+    if (INS_IsRet(ins))
     {
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) br_predict,
-            IARG_INST_PTR, IARG_BRANCH_TAKEN,  IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)br_predict,
+                       IARG_INST_PTR, IARG_BRANCH_TAKEN, IARG_END);
     }
-    else if( INS_IsSyscall(ins) )
+    else if (INS_IsSyscall(ins))
     {
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) br_predict,
-            IARG_INST_PTR, IARG_BRANCH_TAKEN,  IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)br_predict,
+                       IARG_INST_PTR, IARG_BRANCH_TAKEN, IARG_END);
     }
     else if (INS_IsBranch(ins))
     {
-        if( INS_IsCall(ins) ) {
-            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) br_predict,
-                IARG_INST_PTR, IARG_BRANCH_TAKEN,  IARG_END);
+        if (INS_IsCall(ins))
+        {
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)br_predict,
+                           IARG_INST_PTR, IARG_BRANCH_TAKEN, IARG_END);
         }
-        else {
-            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) br_predict,
-                IARG_INST_PTR, IARG_BRANCH_TAKEN,  IARG_END);
+        else
+        {
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)br_predict,
+                           IARG_INST_PTR, IARG_BRANCH_TAKEN, IARG_END);
         }
     }
-
 }
-
 
 /* ===================================================================== */
 /* Finish Functions                                                      */
 /* ===================================================================== */
-#define OUT(n, a, b) out << n << " " << a << setw(16) << CountSeen. b  << " " << setw(16) << CountTaken. b << endl
+#define OUT(n, a, b) out << n << " " << a << setw(16) << CountSeen.b << " " << setw(16) << CountTaken.b << endl
 
 VOID Fini(int n, void *v)
 {
     write_results(false);
 }
-
 
 /* ===================================================================== */
 /* Main Function                                                         */
@@ -326,7 +325,7 @@ VOID Fini(int n, void *v)
 int main(int argc, char *argv[])
 {
 
-    if( PIN_Init(argc,argv) )
+    if (PIN_Init(argc, argv))
     {
         return Usage();
     }
@@ -340,7 +339,6 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
 
 /* ===================================================================== */
 /* eof */
