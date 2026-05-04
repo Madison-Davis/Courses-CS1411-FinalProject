@@ -1,0 +1,12 @@
+=== Job 102778_0 ===
+    Pintool:   perceptron-tage  (predictors/obj-intel64/part3-perceptron-tage.so)
+    Args:      <none>
+    Benchmark: quantum  (./benchmarks/libquantum_O3 400 25)
+    Output:    saved-results/part3/perceptron-custom-tage-predictor_DEFAULTARGS_quantum.out
+    Started:   Fri May  1 23:56:56 UTC 2026
+N = 400, 47 qubits required
+Random seed: 333
+Measured 131072 (0.500000), fractional approximation is 1/2.
+Possible period is 2.
+400 = 4 * 100
+=== Done: Sat May  2 03:42:41 UTC 2026 ===
