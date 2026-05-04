@@ -1,0 +1,6 @@
+=== Job 97539_3 ===
+    PC BITS:   8
+    NENTRIES:  256
+    Benchmark: quantum
+    Output:    saved-results/part1_table/tage_pc8_n256_quantum.out
+    Started:   Thu Apr 23 16:24:06 UTC 2026

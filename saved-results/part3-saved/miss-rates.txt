@@ -1,0 +1,10 @@
+Experiment                                            Miss Rate (%)
+-------------------------------------------------------------------
+perceptron-tage_DEFAULTARGSV2_quantum                       0.0476%
+perceptron-predictor_DEFAULTARGS_hmmer                      0.6562%
+perceptron-tage_DEFAULTARGS_hmmer                           0.6845%
+perceptron-confidence-gated-ghr_DEFAULTARGS_hmmer           0.6846%
+perceptron-training-freezing_DEFAULTARGS_hmmer              0.7475%
+perceptron-dynamic-theta-v2_DEFAULTARGS_hmmer               0.9699%
+_DEFAULTARGS_hmmer                                          0.9716%
+perceptron-dynamic-theta-v1_DEFAULTARGS_hmmer               1.1201%
