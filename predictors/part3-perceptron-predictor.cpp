@@ -24,6 +24,8 @@ KNOB<UINT64> KnobBranchLimit(KNOB_MODE_WRITEONCE, "pintool",
                             "l", "0", "set limit of branches analyzed");
 KNOB<UINT32> KnobNumPerceptrons(KNOB_MODE_WRITEONCE, "pintool",
                             "n", "256", "number of perceptrons in table");
+KNOB<UINT32> KnobHistoryLen(KNOB_MODE_WRITEONCE, "pintool",
+                            "hist", "32", "number of history bits in GHR");
 
 /* ===================================================================== */
 /* Global Variables */
@@ -79,9 +81,9 @@ end if
 /* ===================================================================== */
 /* Runtime-Configurable Perceptron Parameters                            */
 /* ===================================================================== */
-const int HISTORY_LEN       = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
-const int NUM_PERCEPTRONS   = 256;                              // size of perceptron table
-const int THETA             = (int)(1.93 * HISTORY_LEN + 14);   // training threshold from paper (empirically derived, floor [1.93h + 14]
+int HISTORY_LEN             = 32;                               // global history register (GHR) bits (paper states btw 12-62; 28 for 4KB budget, 59-62 for larger)
+int NUM_PERCEPTRONS         = 256;                              // size of perceptron table
+int THETA                   = 0;    // set in perceptron_init()
 const int WEIGHT_MAX        = 127;                              // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 const int WEIGHT_MIN        = -127;                             // 2^7; saturation bounds for weights, paper used 7-9 bit signed weights (7 for hist length 12, 9 for 62)
 
@@ -94,7 +96,7 @@ const int WEIGHT_MIN        = -127;                             // 2^7; saturati
     - -1 = not taken
     - Initialized to "not taken" (-1)
 */
-std::vector<int> GHR(HISTORY_LEN, -1);
+std::vector<int> GHR;
 
 /* 2. Perceptron Table
    - NUM_PERCEPTRONS rows
@@ -201,25 +203,16 @@ void perceptron_update(ADDRINT pc, bool taken)
 */
 void perceptron_init()
 {
-    int num_perc = (int)KnobNumPerceptrons.Value();
+    HISTORY_LEN   = (int)KnobHistoryLen.Value();
+    NUM_PERCEPTRONS = (int)KnobNumPerceptrons.Value();
+    THETA         = (int)(1.93 * HISTORY_LEN + 14);
 
-    GHR.resize(HISTORY_LEN);
+    GHR.assign(HISTORY_LEN, -1);
 
-    for(int i = 0; i < HISTORY_LEN; i++)
+    perceptron_table.resize(NUM_PERCEPTRONS);
+    for(int i = 0; i < NUM_PERCEPTRONS; i++)
     {
-        GHR[i] = -1;
-    }
-
-    perceptron_table.resize(num_perc);
-
-    for(int i = 0; i < num_perc; i++)
-    {
-        perceptron_table[i].resize(HISTORY_LEN + 1);
-
-        for(int j = 0; j <= HISTORY_LEN; j++)
-        {
-            perceptron_table[i][j] = 0;
-        }
+        perceptron_table[i].assign(HISTORY_LEN + 1, 0);
     }
 }
 

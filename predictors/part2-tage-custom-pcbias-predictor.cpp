@@ -122,9 +122,9 @@ struct bias_table
 bias_table t_bias;                          // bias table, separate from base predictor
 static bool g_used_bias = false;            // whether bias table provided the prediction
 static int g_bias_idx = -1;                 // index into bias table used this prediction
-static const int BIAS_ENTRIES = 4096;       // bias table size
-static const int BIAS_STRONG_LO = 0;        // counters <= this are strong not-taken
-static const int BIAS_STRONG_HI = 7;        // counters >= this are strong taken
+static const int BIAS_ENTRIES = 512;        // bias table size
+static const int BIAS_STRONG_LO = 1;        // counters <= this are strong not-taken
+static const int BIAS_STRONG_HI = 6;        // counters >= this are strong taken
 
 /* ===================================================================== */
 /* Table Structures                                                      */
